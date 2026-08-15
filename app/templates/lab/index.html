@@ -1,0 +1,963 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Lab — Rivive SCH</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{--p:#3d1a78;--pm:#5b21b6;--pa:#7c3aed;--pl:#ede9fe;--border:#e9d5ff}
+*{font-family:'DM Sans',sans-serif;box-sizing:border-box}
+body{background:#f8f5ff;color:#1f2937;margin:0}
+.mc-subnav{display:flex;align-items:center;background:#fff;border-bottom:2px solid var(--border);
+  padding:0 8px;overflow-x:auto;scrollbar-width:none;min-height:44px}
+.mc-subnav-item{padding:10px 14px;font-size:.8rem;font-weight:500;color:#6b7280;
+  text-decoration:none;border-bottom:2px solid transparent;white-space:nowrap;
+  transition:color .15s;cursor:pointer;background:none;border-left:none;border-right:none;border-top:none}
+.mc-subnav-item:hover{color:var(--p)}
+.mc-subnav-item.active{color:var(--p);border-bottom-color:var(--p);font-weight:700}
+.mc-page-header{display:flex;justify-content:space-between;align-items:flex-start;
+  padding:16px 20px 10px;flex-wrap:wrap;gap:10px}
+.mc-page-title{font-size:1.15rem;font-weight:800;color:var(--p);margin:0}
+.mc-breadcrumb{font-size:.75rem;color:#6b7280;margin-top:2px}
+.mc-card{background:#fff;border:1px solid var(--border);border-radius:12px;
+  overflow:hidden;margin-bottom:16px;box-shadow:0 1px 4px rgba(61,26,120,.06)}
+.mc-card-header{display:flex;align-items:center;gap:8px;padding:10px 16px;
+  background:#f5f0ff;font-size:.82rem;font-weight:600;border-bottom:1px solid var(--border)}
+.mc-card-body{padding:16px}
+.mc-table-wrap{overflow-x:auto}
+.mc-table{width:100%;border-collapse:collapse;font-size:.8rem}
+.mc-table thead tr{background:#f5f0ff}
+.mc-table th{padding:9px 12px;font-weight:700;color:var(--p);border-bottom:2px solid var(--border);white-space:nowrap}
+.mc-table td{padding:9px 12px;border-bottom:1px solid #f3e8ff;vertical-align:middle}
+.mc-table tbody tr:hover{background:#faf5ff}
+.mc-badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:20px;
+  font-size:.68rem;font-weight:600;white-space:nowrap}
+.badge-ordered{background:#dbeafe;color:#1d4ed8}
+.badge-collected{background:#fef3c7;color:#92400e}
+.badge-resulted{background:#ede9fe;color:#5b21b6}
+.badge-approved{background:#d1fae5;color:#065f46}
+.badge-routine{background:#f3f4f6;color:#374151}
+.badge-urgent{background:#fef3c7;color:#92400e}
+.badge-stat{background:#fee2e2;color:#991b1b}
+.badge-paid{background:#d1fae5;color:#065f46}
+.badge-pending{background:#fef3c7;color:#92400e}
+.badge-credit{background:#fee2e2;color:#991b1b}
+.mc-uhid{background:#f5f0ff;color:var(--pm);padding:2px 8px;border-radius:6px;
+  font-size:.72rem;font-weight:700;font-family:monospace}
+.mc-pager{display:flex;justify-content:space-between;align-items:center;
+  padding:10px 16px;border-top:1px solid var(--border);font-size:.78rem;color:#6b7280}
+.mc-label{font-size:.75rem;font-weight:600;color:#374151;margin-bottom:4px;display:block}
+.mc-stat{display:flex;align-items:center;gap:12px;background:#fff;
+  border:1px solid var(--border);border-radius:10px;padding:14px 18px}
+.mc-stat-icon{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;
+  justify-content:center;font-size:1.1rem;flex-shrink:0}
+.mc-stat-val{font-size:1.4rem;font-weight:800;color:#1f2937;line-height:1}
+.mc-stat-lbl{font-size:.7rem;color:#6b7280;margin-top:2px}
+.icon-purple{background:#ede9fe;color:var(--pm)}
+.icon-red{background:#fee2e2;color:#dc2626}
+.icon-amber{background:#fef3c7;color:#d97706}
+.icon-green{background:#d1fae5;color:#059669}
+.icon-blue{background:#dbeafe;color:#2563eb}
+.mc-content{padding:0 20px 20px}
+.required::after{content:" *";color:#dc2626}
+</style>
+</head>
+<body>
+
+<!-- Subnav -->
+<div class="mc-subnav">
+  {% for tid, lbl, icon in [
+    ('registration','Registration','person-plus'),
+    ('collection','Sample Collection','droplet'),
+    ('results','Result Entry','pencil-square'),
+    ('approval','Approval','check-circle'),
+    ('pending','Pending Tests','hourglass-split'),
+    ('approved','Approved Tests','clipboard-check'),
+    ('settings','Settings','gear'),
+  ] %}
+  <a href="{{ url_for('lab.index', tab=tid) }}"
+     class="mc-subnav-item {% if tab==tid %}active{% endif %}">
+    <i class="bi bi-{{ icon }} me-1"></i>{{ lbl }}
+    {% if tid=='pending' and tab=='pending' and orders is defined %}
+    <span class="badge ms-1" style="background:#dc2626;color:#fff;font-size:.58rem">
+      {{ orders.total }}
+    </span>
+    {% endif %}
+  </a>
+  {% endfor %}
+  <div class="ms-auto d-flex gap-2 pe-2">
+    <a href="{{ url_for('lab.register_order') }}"
+       class="btn btn-sm" style="background:#3d1a78;color:#fff;border:none">
+      <i class="bi bi-plus-circle me-1"></i>New Order
+    </a>
+  </div>
+</div>
+
+<div class="mc-content" style="margin-top:8px">
+
+{# ══════════════ STAGE 1: REGISTRATION LIST ══════════════ #}
+{% if tab == 'registration' %}
+<div class="mc-page-header px-0">
+  <div>
+    <div class="mc-page-title"><i class="bi bi-person-plus me-2"></i>Lab Registrations</div>
+    <div class="mc-breadcrumb">Today — {{ today.strftime('%d %b %Y') }}</div>
+  </div>
+  <form method="GET" class="d-flex gap-2">
+    <input type="hidden" name="tab" value="registration">
+    <input type="text" name="q" class="form-control form-control-sm"
+           placeholder="Patient name or UHID…" value="{{ search or '' }}" style="width:220px">
+    <button type="submit" class="btn btn-sm btn-primary">Search</button>
+  </form>
+</div>
+<div class="mc-card">
+  <div class="mc-card-body p-0">
+    <div class="mc-table-wrap">
+      <table class="mc-table">
+        <thead><tr>
+          <th>Order No.</th><th>Patient</th><th>UHID</th><th>Doctor</th>
+          <th>Tests</th><th>Priority</th><th>Amount</th>
+          <th>Payment</th><th>Status</th><th>Action</th>
+        </tr></thead>
+        <tbody>
+          {% for o in orders.items %}
+          <tr>
+            <td><span class="mc-uhid">{{ o.order_number }}</span></td>
+            <td>
+              <div class="fw-semibold">{{ o.patient.full_name if o.patient else '—' }}</div>
+              <div class="text-muted" style="font-size:.7rem">{{ o.ordered_at.strftime('%H:%M') }}</div>
+            </td>
+            <td><span class="mc-uhid">{{ o.patient.uhid if o.patient else '—' }}</span></td>
+            <td class="text-muted" style="font-size:.75rem">
+              {{ o.doctor.full_name if o.doctor else '—' }}
+            </td>
+            <td style="font-size:.78rem">{{ o.items.count() }} test(s)</td>
+            <td>
+              <span class="mc-badge badge-{{ o.priority }}">{{ o.priority|title }}</span>
+            </td>
+            <td class="fw-semibold">₹{{ "{:,.2f}".format(o.total_amount or 0) }}</td>
+            <td>
+              <span class="mc-badge badge-{{ o.payment_status }}">
+                {{ o.payment_status|title }}
+              </span>
+            </td>
+            <td>
+              <span class="mc-badge badge-{{ o.status|replace('_','-') }}">
+                {{ o.status|replace('_',' ')|title }}
+              </span>
+            </td>
+            <td>
+              <div class="d-flex gap-1">
+                <a href="{{ url_for('lab.enter_results', order_id=o.id) }}"
+                   class="btn btn-sm" style="background:#5b21b6;color:#fff;border:none;
+                          padding:3px 8px;font-size:.72rem">
+                  <i class="bi bi-pencil-square"></i>
+                </a>
+                <a href="{{ url_for('lab.view_report', order_id=o.id) }}"
+                   class="btn btn-sm btn-outline-secondary"
+                   style="padding:3px 8px;font-size:.72rem">
+                  <i class="bi bi-eye"></i>
+                </a>
+              </div>
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="10" class="text-center py-5 text-muted">
+            <i class="bi bi-eyedropper" style="font-size:2rem;display:block;opacity:.2;margin-bottom:8px"></i>
+            No lab orders today.
+            <a href="{{ url_for('lab.register_order') }}">Register one →</a>
+          </td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% if orders and orders.pages > 1 %}
+  <div class="mc-pager">
+    <span>{{ orders.total }} orders</span>
+    <div class="d-flex gap-1">
+      {% if orders.has_prev %}
+      <a href="{{ url_for('lab.index', tab='registration', page=orders.prev_num) }}"
+         class="btn btn-sm btn-outline-secondary">‹ Prev</a>
+      {% endif %}
+      {% if orders.has_next %}
+      <a href="{{ url_for('lab.index', tab='registration', page=orders.next_num) }}"
+         class="btn btn-sm btn-outline-secondary">Next ›</a>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+{# ══════════════ STAGE 2: SAMPLE COLLECTION ══════════════ #}
+{% elif tab == 'collection' %}
+<div class="mc-page-header px-0">
+  <div>
+    <div class="mc-page-title"><i class="bi bi-droplet me-2"></i>Sample Collection Queue</div>
+    <div class="mc-breadcrumb">Phlebotomist selects and timestamps update on collection</div>
+  </div>
+  <span class="badge" style="background:#5b21b6;color:#fff;font-size:.9rem;padding:7px 14px">
+    {{ orders|length }} pending
+  </span>
+</div>
+<div class="mc-card">
+  <div class="mc-card-body p-0">
+    <div class="mc-table-wrap">
+      <table class="mc-table">
+        <thead><tr>
+          <th>Order No.</th><th>Patient</th><th>Tests</th><th>Priority</th>
+          <th>Ordered At</th><th>Phlebotomist</th><th>Fasting</th><th>Collect</th>
+        </tr></thead>
+        <tbody>
+          {% for o in orders %}
+          <tr style="{% if o.priority=='stat' %}background:#fff8f8{% endif %}">
+            <td><span class="mc-uhid">{{ o.order_number }}</span></td>
+            <td>
+              <div class="fw-semibold">{{ o.patient.full_name if o.patient else '—' }}</div>
+              <div class="text-muted" style="font-size:.68rem">
+                {{ o.patient.uhid if o.patient else '' }}
+              </div>
+            </td>
+            <td style="font-size:.75rem">
+              {% for item in o.items.filter_by(is_deleted=False).all() %}
+              <div>{{ item.test_name }}</div>
+              {% endfor %}
+            </td>
+            <td><span class="mc-badge badge-{{ o.priority }}">{{ o.priority|title }}</span></td>
+            <td style="font-size:.75rem">{{ o.ordered_at.strftime('%d %b %H:%M') }}</td>
+            <td>
+              <form method="POST" action="{{ url_for('lab.collect_sample', order_id=o.id) }}"
+                    id="cf-{{ o.id }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <select name="phlebotomist_id" class="form-select form-select-sm"
+                        style="min-width:140px">
+                  <option value="">— Select —</option>
+                  {% for ph in phlebotomists %}
+                  <option value="{{ ph.id }}">{{ ph.full_name }}</option>
+                  {% endfor %}
+                </select>
+                <input type="text" name="sample_id" class="form-control form-control-sm mt-1"
+                       placeholder="Sample/Tube ID">
+              </form>
+            </td>
+            <td>
+              <div class="form-check" style="margin-top:4px">
+                <input type="checkbox" name="is_fasting" value="1"
+                       class="form-check-input" form="cf-{{ o.id }}"
+                       id="fast-{{ o.id }}" style="accent-color:#5b21b6">
+                <label class="form-check-label" style="font-size:.75rem" for="fast-{{ o.id }}">
+                  Fasting
+                </label>
+              </div>
+            </td>
+            <td>
+              <button type="submit" form="cf-{{ o.id }}"
+                      class="btn btn-sm" style="background:#5b21b6;color:#fff;border:none">
+                <i class="bi bi-droplet me-1"></i>Collect Now
+              </button>
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="8" class="text-center text-success py-5">
+            <i class="bi bi-check-circle me-2"></i>No samples pending collection.
+          </td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+{# ══════════════ STAGE 3: RESULT ENTRY QUEUE ══════════════ #}
+{% elif tab == 'results' %}
+<div class="mc-page-header px-0">
+  <div class="mc-page-title"><i class="bi bi-pencil-square me-2"></i>Enter Results</div>
+</div>
+<div class="mc-card">
+  <div class="mc-card-body p-0">
+    <div class="mc-table-wrap">
+      <table class="mc-table">
+        <thead><tr>
+          <th>Order No.</th><th>Patient</th><th>Tests</th>
+          <th>Collected</th><th>Phlebotomist</th><th>TAT</th><th>Action</th>
+        </tr></thead>
+        <tbody>
+          {% for o in orders.items %}
+          <tr>
+            <td><span class="mc-uhid">{{ o.order_number }}</span></td>
+            <td>
+              <div class="fw-semibold">{{ o.patient.full_name if o.patient else '—' }}</div>
+              <div class="text-muted" style="font-size:.68rem">
+                {{ o.patient.uhid if o.patient else '' }}
+              </div>
+            </td>
+            <td style="font-size:.75rem">{{ o.items.count() }} test(s)</td>
+            <td style="font-size:.75rem">
+              {% if o.sample and o.sample.collected_at %}
+              {{ o.sample.collected_at.strftime('%d %b %H:%M') }}
+              {% if o.sample.is_fasting %}
+              <span class="mc-badge badge-urgent ms-1">Fasting</span>
+              {% endif %}
+              {% else %}—{% endif %}
+            </td>
+            <td style="font-size:.75rem;color:#6b7280">
+              {{ o.sample.phlebotomist.full_name if o.sample and o.sample.phlebotomist else '—' }}
+            </td>
+            <td style="font-size:.75rem">
+              {% if o.sample and o.sample.turnaround_minutes is not none %}
+              {% set m = o.sample.turnaround_minutes %}
+              {% if m >= 60 %}{{ m//60 }}h {{ m%60 }}m{% else %}{{ m }}m{% endif %}
+              {% else %}—{% endif %}
+            </td>
+            <td>
+              <a href="{{ url_for('lab.enter_results', order_id=o.id) }}"
+                 class="btn btn-sm" style="background:#5b21b6;color:#fff;border:none">
+                <i class="bi bi-pencil-square me-1"></i>Enter Results
+              </a>
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="7" class="text-center text-success py-5">
+            <i class="bi bi-check-circle me-2"></i>No results pending entry.
+          </td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+{# ══════════════ STAGE 4: APPROVAL ══════════════ #}
+{% elif tab == 'approval' %}
+<div class="mc-page-header px-0">
+  <div class="mc-page-title"><i class="bi bi-check-circle me-2"></i>Pending Approval</div>
+</div>
+<div class="mc-card">
+  <div class="mc-card-body p-0">
+    <div class="mc-table-wrap">
+      <table class="mc-table">
+        <thead><tr>
+          <th>Order No.</th><th>Patient</th><th>Tests</th>
+          <th>Results Entered</th><th>Critical Values</th><th>Action</th>
+        </tr></thead>
+        <tbody>
+          {% for o in orders.items %}
+          {% set crits = o.results|selectattr('is_critical')|list %}
+          <tr style="{% if crits %}background:#fff8f8{% endif %}">
+            <td><span class="mc-uhid">{{ o.order_number }}</span></td>
+            <td>
+              <div class="fw-semibold">{{ o.patient.full_name if o.patient else '—' }}</div>
+              <div class="text-muted" style="font-size:.68rem">
+                {{ o.patient.uhid if o.patient else '' }}
+              </div>
+            </td>
+            <td style="font-size:.75rem">{{ o.items.count() }} test(s)</td>
+            <td style="font-size:.75rem;color:#6b7280">
+              {% if o.results %}
+              {{ o.results[-1].resulted_at.strftime('%d %b %H:%M') }}
+              {% else %}—{% endif %}
+            </td>
+            <td>
+              {% if crits %}
+              <span class="mc-badge badge-stat">
+                <i class="bi bi-exclamation-triangle me-1"></i>{{ crits|length }} Critical
+              </span>
+              {% else %}
+              <span style="color:#6b7280;font-size:.75rem">None</span>
+              {% endif %}
+            </td>
+            <td>
+              <div class="d-flex gap-2">
+                <a href="{{ url_for('lab.enter_results', order_id=o.id) }}"
+                   class="btn btn-sm btn-outline-secondary" style="font-size:.72rem">
+                  Review
+                </a>
+                <form method="POST"
+                      action="{{ url_for('lab.approve_report', order_id=o.id) }}"
+                      class="d-inline"
+                      onsubmit="return confirm('Approve and lock this report permanently?')">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <input type="hidden" name="approver_note" value="">
+                  <button type="submit" class="btn btn-sm btn-success" style="font-size:.72rem">
+                    <i class="bi bi-check-circle me-1"></i>Approve & Lock
+                  </button>
+                </form>
+              </div>
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="6" class="text-center text-success py-5">
+            <i class="bi bi-check-circle me-2"></i>No reports awaiting approval.
+          </td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+{# ══════════════ STAGE 5: PENDING TESTS ══════════════ #}
+{% elif tab == 'pending' %}
+<div class="mc-page-header px-0">
+  <div>
+    <div class="mc-page-title">
+      <i class="bi bi-hourglass-split me-2"></i>Pending Tests
+    </div>
+    <div class="mc-breadcrumb">All unresolved orders across all stages</div>
+  </div>
+  <span class="badge" style="background:#d97706;color:#fff;font-size:.9rem;padding:7px 14px">
+    {{ orders.total }} pending
+  </span>
+</div>
+<div class="mc-card">
+  <div class="mc-card-body p-0">
+    <div class="mc-table-wrap">
+      <table class="mc-table">
+        <thead><tr>
+          <th>Order No.</th><th>Patient</th><th>Tests & Status</th>
+          <th>Priority</th><th>Ordered</th><th>Current Stage</th><th>Next Action</th>
+        </tr></thead>
+        <tbody>
+          {% for o in orders.items %}
+          <tr>
+            <td><span class="mc-uhid">{{ o.order_number }}</span></td>
+            <td>
+              <div class="fw-semibold">{{ o.patient.full_name if o.patient else '—' }}</div>
+              <div class="text-muted" style="font-size:.68rem">
+                {{ o.patient.uhid if o.patient else '' }}
+              </div>
+            </td>
+            <td style="font-size:.75rem">
+              {% for item in o.items.filter_by(is_deleted=False).all() %}
+              <div class="d-flex align-items-center gap-1 mb-1">
+                {{ item.test_name }}
+                <span class="mc-badge badge-{{ item.status }}">{{ item.status|title }}</span>
+              </div>
+              {% endfor %}
+            </td>
+            <td><span class="mc-badge badge-{{ o.priority }}">{{ o.priority|title }}</span></td>
+            <td style="font-size:.75rem">{{ o.ordered_at.strftime('%d %b %H:%M') }}</td>
+            <td>
+              <span class="mc-badge badge-{{ o.status|replace('_','-') }}">
+                {{ o.status|replace('_',' ')|title }}
+              </span>
+            </td>
+            <td>
+              {% if o.status == 'ordered' %}
+              <a href="{{ url_for('lab.index', tab='collection') }}"
+                 class="btn btn-sm btn-outline-primary" style="font-size:.72rem">
+                Collect Sample
+              </a>
+              {% elif o.status == 'sample_collected' %}
+              <a href="{{ url_for('lab.enter_results', order_id=o.id) }}"
+                 class="btn btn-sm" style="background:#5b21b6;color:#fff;border:none;font-size:.72rem">
+                Enter Results
+              </a>
+              {% elif o.status == 'resulted' %}
+              <a href="{{ url_for('lab.index', tab='approval') }}"
+                 class="btn btn-sm btn-success" style="font-size:.72rem">
+                Approve
+              </a>
+              {% endif %}
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="7" class="text-center text-success py-5">
+            <i class="bi bi-check-circle me-2"></i>No pending tests. All clear!
+          </td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+{# ══════════════ STAGE 6: APPROVED TESTS ══════════════ #}
+{% elif tab == 'approved' %}
+<div class="mc-page-header px-0">
+  <div class="mc-page-title">
+    <i class="bi bi-clipboard-check me-2"></i>Approved Reports
+  </div>
+  <form method="GET" class="d-flex gap-2 align-items-center">
+    <input type="hidden" name="tab" value="approved">
+    <label class="mc-label mb-0" style="font-size:.75rem">From</label>
+    <input type="date" name="date_from" class="form-control form-control-sm"
+           value="{{ d_from }}" style="width:140px">
+    <label class="mc-label mb-0" style="font-size:.75rem">To</label>
+    <input type="date" name="date_to" class="form-control form-control-sm"
+           value="{{ d_to }}" style="width:140px">
+    <button type="submit" class="btn btn-sm btn-primary">Filter</button>
+  </form>
+</div>
+<div class="mc-card">
+  <div class="mc-card-body p-0">
+    <div class="mc-table-wrap">
+      <table class="mc-table">
+        <thead><tr>
+          <th>Order No.</th><th>Patient</th><th>Tests</th>
+          <th>Approved By</th><th>Approved At</th><th>Critical</th><th>Action</th>
+        </tr></thead>
+        <tbody>
+          {% for o in orders.items %}
+          {% set crits = o.results|selectattr('is_critical')|list %}
+          <tr>
+            <td><span class="mc-uhid">{{ o.order_number }}</span></td>
+            <td>
+              <div class="fw-semibold">{{ o.patient.full_name if o.patient else '—' }}</div>
+              <div class="text-muted" style="font-size:.68rem">
+                {{ o.patient.uhid if o.patient else '' }}
+              </div>
+            </td>
+            <td style="font-size:.75rem">{{ o.items.count() }} test(s)</td>
+            <td style="font-size:.75rem;color:#6b7280">
+              {{ o.approval.approver.full_name if o.approval and o.approval.approver else '—' }}
+            </td>
+            <td style="font-size:.75rem">
+              {{ o.approval.approved_at.strftime('%d %b %Y %H:%M') if o.approval else '—' }}
+            </td>
+            <td>
+              {% if crits %}
+              <span class="mc-badge badge-stat">{{ crits|length }} Critical</span>
+              {% else %}
+              <span style="color:#6b7280;font-size:.75rem">None</span>
+              {% endif %}
+            </td>
+            <td>
+              <div class="d-flex gap-1">
+                <a href="{{ url_for('lab.view_report', order_id=o.id) }}"
+                   class="btn btn-sm btn-outline-primary" style="font-size:.72rem">
+                  <i class="bi bi-eye me-1"></i>View
+                </a>
+                <a href="{{ url_for('lab.view_report', order_id=o.id) }}?print=1"
+                   class="btn btn-sm btn-outline-secondary"
+                   style="font-size:.72rem" target="_blank">
+                  <i class="bi bi-printer me-1"></i>Print
+                </a>
+              </div>
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="7" class="text-center text-muted py-5">
+            No approved reports for this period.
+          </td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+{# ══════════════ SETTINGS ══════════════ #}
+{% elif tab == 'settings' %}
+<div class="mc-page-header px-0">
+  <div>
+    <div class="mc-page-title"><i class="bi bi-gear me-2"></i>Lab Settings</div>
+    <div class="mc-breadcrumb">Add or edit tests and reference ranges</div>
+  </div>
+  <button class="btn btn-sm" style="background:#3d1a78;color:#fff;border:none"
+          data-bs-toggle="modal" data-bs-target="#testModal">
+    <i class="bi bi-plus-circle me-1"></i>Add New Test
+  </button>
+</div>
+
+<!-- Sub-tab toggle -->
+<div class="d-flex gap-2 mb-3">
+  {% for sid, slbl in [('tests','Test Master'),('categories','Categories')] %}
+  <a href="{{ url_for('lab.index', tab='settings', subtab=sid) }}"
+     class="btn btn-sm {% if subtab==sid %}btn-primary{% else %}btn-outline-secondary{% endif %}">
+    {{ slbl }}
+  </a>
+  {% endfor %}
+</div>
+
+{% if subtab == 'categories' %}
+<div class="row g-3">
+  <div class="col-md-6">
+    <div class="mc-card">
+      <div class="mc-card-header">Categories</div>
+      <div class="mc-card-body p-0">
+        <table class="mc-table">
+          <thead><tr><th>Code</th><th>Category Name</th><th>Tests</th></tr></thead>
+          <tbody>
+            {% for cat in categories %}
+            <tr>
+              <td><span class="mc-uhid">{{ cat.code or '—' }}</span></td>
+              <td class="fw-semibold">{{ cat.name }}</td>
+              <td style="font-size:.75rem;color:#6b7280">{{ cat.tests|length }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="3" class="text-muted text-center py-4">No categories yet.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="mc-card">
+      <div class="mc-card-header">Add Category</div>
+      <div class="mc-card-body">
+        <form method="POST" action="{{ url_for('lab.category_save') }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <div class="mb-2">
+            <label class="mc-label required">Category Name</label>
+            <input type="text" name="name" class="form-control form-control-sm" required
+                   placeholder="e.g. Haematology">
+          </div>
+          <div class="mb-3">
+            <label class="mc-label">Code</label>
+            <input type="text" name="code" class="form-control form-control-sm" placeholder="HAEM">
+          </div>
+          <button type="submit" class="btn btn-sm btn-primary">Add Category</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% else %}
+<!-- Test Master list -->
+<div class="mc-card mb-2">
+  <div class="mc-card-body py-2">
+    <form method="GET" class="d-flex gap-2">
+      <input type="hidden" name="tab" value="settings">
+      <input type="hidden" name="subtab" value="tests">
+      <input type="text" name="q" class="form-control form-control-sm"
+             placeholder="Search test name or code…"
+             value="{{ search or '' }}" style="max-width:260px">
+      <button type="submit" class="btn btn-sm btn-primary">Search</button>
+    </form>
+  </div>
+</div>
+<div class="mc-card">
+  <div class="mc-card-body p-0">
+    <div class="mc-table-wrap">
+      <table class="mc-table">
+        <thead><tr>
+          <th>Code</th><th>Test Name</th><th>Category</th><th>Sample</th>
+          <th>Unit</th><th>Normal Range</th>
+          <th>Male Range</th><th>Female Range</th>
+          <th>Normal Low</th><th>Normal High</th>
+          <th>Critical Low</th><th>Critical High</th>
+          <th>Price (₹)</th><th>TAT</th><th>Action</th>
+        </tr></thead>
+        <tbody>
+          {% for t in tests.items %}
+          <tr>
+            <td><span class="mc-uhid">{{ t.test_code or '—' }}</span></td>
+            <td class="fw-semibold">{{ t.test_name }}</td>
+            <td style="font-size:.75rem;color:#6b7280">
+              {{ t.category.name if t.category else '—' }}
+            </td>
+            <td style="font-size:.75rem">{{ t.sample_type or '—' }}</td>
+            <td style="font-size:.75rem">{{ t.unit or '—' }}</td>
+            <td style="font-size:.75rem">{{ t.normal_range or t.normal_range_text or '—' }}</td>
+            <td style="font-size:.75rem;color:#6b7280">{{ t.male_range or '—' }}</td>
+            <td style="font-size:.75rem;color:#6b7280">{{ t.female_range or '—' }}</td>
+            <td style="font-size:.75rem">{{ t.normal_low or '—' }}</td>
+            <td style="font-size:.75rem">{{ t.normal_high or '—' }}</td>
+            <td style="font-size:.75rem;color:#dc2626;font-weight:600">
+              {{ t.critical_low or '—' }}
+            </td>
+            <td style="font-size:.75rem;color:#dc2626;font-weight:600">
+              {{ t.critical_high or '—' }}
+            </td>
+            <td style="font-size:.75rem">₹{{ "{:.2f}".format(t.price or 0) }}</td>
+            <td style="font-size:.75rem;color:#6b7280">{{ t.turnaround_hrs or 24 }}h</td>
+            <td>
+              <div class="d-flex gap-1">
+                <!-- Edit button passes data to modal -->
+                <button class="btn btn-sm btn-outline-secondary edit-test-btn"
+                        style="padding:3px 8px;font-size:.72rem"
+                        data-id="{{ t.id }}"
+                        data-code="{{ t.test_code or '' }}"
+                        data-name="{{ t.test_name }}"
+                        data-short="{{ t.test_short_name or '' }}"
+                        data-cat="{{ t.category_id or '' }}"
+                        data-sample="{{ t.sample_type or '' }}"
+                        data-method="{{ t.method or '' }}"
+                        data-dept="{{ t.department or '' }}"
+                        data-unit="{{ t.unit or '' }}"
+                        data-range="{{ t.normal_range or '' }}"
+                        data-range-text="{{ t.normal_range_text or '' }}"
+                        data-male="{{ t.male_range or '' }}"
+                        data-female="{{ t.female_range or '' }}"
+                        data-nlow="{{ t.normal_low or '' }}"
+                        data-nhigh="{{ t.normal_high or '' }}"
+                        data-clow="{{ t.critical_low or '' }}"
+                        data-chigh="{{ t.critical_high or '' }}"
+                        data-price="{{ t.price or 0 }}"
+                        data-gst="{{ t.gst_percent or 0 }}"
+                        data-tat="{{ t.turnaround_hrs or 24 }}"
+                        data-note="{{ t.print_note or '' }}"
+                        title="Edit">
+                  <i class="bi bi-pencil"></i>
+                </button>
+                <form method="POST"
+                      action="{{ url_for('lab.test_delete', test_id=t.id) }}"
+                      class="d-inline"
+                      onsubmit="return confirm('Remove this test?')">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <button type="submit" class="btn btn-sm btn-outline-danger"
+                          style="padding:3px 8px;font-size:.72rem">
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </form>
+              </div>
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="15" class="text-center text-muted py-5">
+            No tests configured.
+            <button data-bs-toggle="modal" data-bs-target="#testModal"
+                    class="btn btn-link p-0 ms-1" style="font-size:.8rem">
+              Add your first test →
+            </button>
+          </td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% if tests and tests.pages > 1 %}
+  <div class="mc-pager">
+    <span>{{ tests.total }} tests</span>
+    <div class="d-flex gap-1">
+      {% if tests.has_prev %}
+      <a href="{{ url_for('lab.index', tab='settings', subtab='tests', page=tests.prev_num) }}"
+         class="btn btn-sm btn-outline-secondary">‹</a>
+      {% endif %}
+      {% if tests.has_next %}
+      <a href="{{ url_for('lab.index', tab='settings', subtab='tests', page=tests.next_num) }}"
+         class="btn btn-sm btn-outline-secondary">›</a>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endif %}
+{% endif %}
+
+</div><!-- end mc-content -->
+
+{# ══ ADD / EDIT TEST MODAL ══ #}
+<div class="modal fade" id="testModal" tabindex="-1">
+<div class="modal-dialog modal-xl"><div class="modal-content">
+<div class="modal-header" style="background:#f5f0ff">
+  <h5 class="modal-title" id="testModalTitle" style="color:#3d1a78">
+    <i class="bi bi-flask me-2"></i>Add New Test
+  </h5>
+  <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+</div>
+<form method="POST" action="{{ url_for('lab.test_save') }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+<input type="hidden" name="test_id" id="f_test_id">
+<div class="modal-body">
+  <div class="row g-3">
+
+    <!-- LEFT: Identity + Pricing -->
+    <div class="col-md-6">
+      <div style="background:#f5f0ff;border-radius:8px;padding:14px;margin-bottom:12px">
+        <div style="font-weight:700;font-size:.8rem;color:#3d1a78;margin-bottom:10px">
+          Test Identity
+        </div>
+        <div class="row g-2">
+          <div class="col-4">
+            <label class="mc-label">Test Code</label>
+            <input type="text" name="test_code" id="f_code"
+                   class="form-control form-control-sm" placeholder="CBC / LFT">
+          </div>
+          <div class="col-8">
+            <label class="mc-label required">Test Name</label>
+            <input type="text" name="test_name" id="f_name"
+                   class="form-control form-control-sm" required
+                   placeholder="Complete Blood Count">
+          </div>
+          <div class="col-6">
+            <label class="mc-label">Short Name</label>
+            <input type="text" name="test_short_name" id="f_short"
+                   class="form-control form-control-sm">
+          </div>
+          <div class="col-6">
+            <label class="mc-label">Category</label>
+            <select name="category_id" id="f_cat" class="form-select form-select-sm">
+              <option value="">— Select —</option>
+              {% if categories is defined %}
+              {% for cat in categories %}
+              <option value="{{ cat.id }}">{{ cat.name }}</option>
+              {% endfor %}
+              {% endif %}
+            </select>
+          </div>
+          <div class="col-6">
+            <label class="mc-label">Sample Type</label>
+            <select name="sample_type" id="f_sample" class="form-select form-select-sm">
+              <option value="">—</option>
+              {% for s in ['Blood','Urine','Stool','Swab','Sputum','CSF','Serum','Plasma','Other'] %}
+              <option>{{ s }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-6">
+            <label class="mc-label">Method</label>
+            <input type="text" name="method" id="f_method"
+                   class="form-control form-control-sm" placeholder="Colorimetric / ELISA">
+          </div>
+          <div class="col-6">
+            <label class="mc-label">Department</label>
+            <input type="text" name="department" id="f_dept"
+                   class="form-control form-control-sm" placeholder="Biochemistry">
+          </div>
+          <div class="col-6">
+            <label class="mc-label">Unit</label>
+            <input type="text" name="unit" id="f_unit"
+                   class="form-control form-control-sm" placeholder="mg/dL / IU/L / %">
+          </div>
+          <div class="col-4">
+            <label class="mc-label">Price (₹)</label>
+            <input type="number" step="0.01" name="price" id="f_price"
+                   class="form-control form-control-sm" value="0">
+          </div>
+          <div class="col-4">
+            <label class="mc-label">GST %</label>
+            <input type="number" step="0.01" name="gst_percent" id="f_gst"
+                   class="form-control form-control-sm" value="0">
+          </div>
+          <div class="col-4">
+            <label class="mc-label">TAT (hrs)</label>
+            <input type="number" name="turnaround_hrs" id="f_tat"
+                   class="form-control form-control-sm" value="24">
+          </div>
+          <div class="col-12">
+            <label class="mc-label">Print Note (below result)</label>
+            <textarea name="print_note" id="f_note"
+                      class="form-control form-control-sm" rows="2"
+                      placeholder="Note printed below result in report…"></textarea>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT: Reference Ranges -->
+    <div class="col-md-6">
+      <div style="background:#f0fdf4;border-radius:8px;padding:14px;margin-bottom:12px">
+        <div style="font-weight:700;font-size:.8rem;color:#065f46;margin-bottom:10px">
+          Reference Ranges
+        </div>
+        <div class="row g-2">
+          <div class="col-12">
+            <label class="mc-label">Normal Range (General display text)</label>
+            <input type="text" name="normal_range" id="f_range"
+                   class="form-control form-control-sm" placeholder="70-110">
+          </div>
+          <div class="col-12">
+            <label class="mc-label">Normal Range Text (for non-numeric results)</label>
+            <input type="text" name="normal_range_text" id="f_range_text"
+                   class="form-control form-control-sm"
+                   placeholder="Negative / Absent / Not detected">
+          </div>
+          <div class="col-6">
+            <label class="mc-label">Male Range</label>
+            <input type="text" name="male_range" id="f_male"
+                   class="form-control form-control-sm" placeholder="13.5-17.5 g/dL">
+          </div>
+          <div class="col-6">
+            <label class="mc-label">Female Range</label>
+            <input type="text" name="female_range" id="f_female"
+                   class="form-control form-control-sm" placeholder="11.5-15.5 g/dL">
+          </div>
+        </div>
+      </div>
+
+      <div style="background:#fff5f5;border-radius:8px;padding:14px">
+        <div style="font-weight:700;font-size:.8rem;color:#991b1b;margin-bottom:6px">
+          Numeric Limits — Auto-flagging
+        </div>
+        <div style="font-size:.72rem;color:#6b7280;margin-bottom:10px">
+          <i class="bi bi-info-circle me-1"></i>
+          Values outside <strong>Critical</strong> range → LL/HH alert (red).
+          Values outside <strong>Normal</strong> range → L/H flag (amber).
+        </div>
+        <div class="row g-2">
+          <div class="col-6">
+            <label class="mc-label">Normal Low</label>
+            <input type="number" step="0.0001" name="normal_low" id="f_nlow"
+                   class="form-control form-control-sm">
+          </div>
+          <div class="col-6">
+            <label class="mc-label">Normal High</label>
+            <input type="number" step="0.0001" name="normal_high" id="f_nhigh"
+                   class="form-control form-control-sm">
+          </div>
+          <div class="col-6">
+            <label class="mc-label" style="color:#dc2626">Critical Low ⬇</label>
+            <input type="number" step="0.0001" name="critical_low" id="f_clow"
+                   class="form-control form-control-sm"
+                   style="border-color:#fca5a5">
+          </div>
+          <div class="col-6">
+            <label class="mc-label" style="color:#dc2626">Critical High ⬆</label>
+            <input type="number" step="0.0001" name="critical_high" id="f_chigh"
+                   class="form-control form-control-sm"
+                   style="border-color:#fca5a5">
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+<div class="modal-footer" style="background:#f5f0ff">
+  <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+  <button type="submit" class="btn btn-primary">
+    <i class="bi bi-check-circle me-1"></i>Save Test
+  </button>
+</div>
+</form>
+</div></div></div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+// Edit button → populate modal
+document.querySelectorAll('.edit-test-btn').forEach(btn => {
+  btn.addEventListener('click', function() {
+    const d = this.dataset;
+    document.getElementById('testModalTitle').innerHTML =
+      '<i class="bi bi-pencil me-2"></i>Edit Test';
+    document.getElementById('f_test_id').value = d.id;
+    document.getElementById('f_code').value    = d.code;
+    document.getElementById('f_name').value    = d.name;
+    document.getElementById('f_short').value   = d.short;
+    document.getElementById('f_sample').value  = d.sample;
+    document.getElementById('f_method').value  = d.method;
+    document.getElementById('f_dept').value    = d.dept;
+    document.getElementById('f_unit').value    = d.unit;
+    document.getElementById('f_range').value   = d.range;
+    document.getElementById('f_range_text').value = d.rangeText || '';
+    document.getElementById('f_male').value    = d.male;
+    document.getElementById('f_female').value  = d.female;
+    document.getElementById('f_nlow').value    = d.nlow;
+    document.getElementById('f_nhigh').value   = d.nhigh;
+    document.getElementById('f_clow').value    = d.clow;
+    document.getElementById('f_chigh').value   = d.chigh;
+    document.getElementById('f_price').value   = d.price;
+    document.getElementById('f_gst').value     = d.gst;
+    document.getElementById('f_tat').value     = d.tat;
+    document.getElementById('f_note').value    = d.note;
+    if(d.cat) document.getElementById('f_cat').value = d.cat;
+    new bootstrap.Modal(document.getElementById('testModal')).show();
+  });
+});
+
+// Reset modal on close
+document.getElementById('testModal').addEventListener('hidden.bs.modal', function() {
+  document.getElementById('testModalTitle').innerHTML =
+    '<i class="bi bi-flask me-2"></i>Add New Test';
+  document.getElementById('f_test_id').value = '';
+  this.querySelector('form').reset();
+});
+</script>
+</body>
+</html>

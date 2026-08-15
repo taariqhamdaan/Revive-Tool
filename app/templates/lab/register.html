@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>New Lab Order — Rivive SCH</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{--p:#3d1a78;--pm:#5b21b6;--pa:#7c3aed;--pl:#ede9fe;--border:#e9d5ff}
+*{font-family:'DM Sans',sans-serif;box-sizing:border-box}
+body{background:#f8f5ff;color:#1f2937;margin:0}
+.mc-subnav{display:flex;align-items:center;background:#fff;border-bottom:2px solid var(--border);
+  padding:0 8px;overflow-x:auto;scrollbar-width:none;min-height:44px}
+.mc-subnav-item{padding:10px 14px;font-size:.8rem;font-weight:500;color:#6b7280;
+  text-decoration:none;border-bottom:2px solid transparent;white-space:nowrap}
+.mc-subnav-item:hover{color:var(--p)}
+.mc-subnav-item.active{color:var(--p);border-bottom-color:var(--p);font-weight:700}
+.mc-card{background:#fff;border:1px solid var(--border);border-radius:12px;overflow:hidden;
+  margin-bottom:16px;box-shadow:0 1px 4px rgba(61,26,120,.06)}
+.mc-card-header{display:flex;align-items:center;gap:8px;padding:10px 16px;
+  background:#f5f0ff;font-size:.82rem;font-weight:600;border-bottom:1px solid var(--border)}
+.mc-card-body{padding:16px}
+.mc-label{font-size:.75rem;font-weight:600;color:#374151;margin-bottom:4px;display:block}
+.required::after{content:" *";color:#dc2626}
+.test-card{border:1px solid var(--border);border-radius:8px;padding:10px;cursor:pointer;
+  display:flex;gap:8px;align-items:flex-start;transition:.15s;background:#fff}
+.test-card:hover{border-color:var(--pm);background:#faf5ff}
+.test-card.selected{border-color:var(--pm);background:#faf5ff}
+.stage-pill{flex:1;text-align:center;padding:8px 12px;border-radius:8px;
+  font-size:.78rem;font-weight:600;transition:.15s}
+.stage-active{background:var(--p);color:#fff}
+.stage-idle{background:#f3f4f6;color:#6b7280}
+.patient-result{padding:10px 12px;cursor:pointer;border-bottom:1px solid #f3f4f6;font-size:.82rem}
+.patient-result:hover{background:#f5f0ff}
+</style>
+</head>
+<body>
+
+<div class="mc-subnav">
+  <a href="{{ url_for('lab.index', tab='registration') }}" class="mc-subnav-item">
+    <i class="bi bi-arrow-left me-1"></i>Back to Lab
+  </a>
+  <span class="mc-subnav-item active">
+    <i class="bi bi-person-plus me-1"></i>New Lab Order
+  </span>
+</div>
+
+<div style="padding:16px 20px">
+
+  <!-- Stage progress indicator -->
+  <div class="d-flex gap-2 mb-4">
+    {% for n, lbl in [(1,'Patient Details'),(2,'Test Selection'),(3,'Payment')] %}
+    <div class="stage-pill {% if loop.index == 1 %}stage-active{% else %}stage-idle{% endif %}"
+         id="stage-pill-{{ n }}">
+      <span style="display:inline-flex;width:20px;height:20px;border-radius:50%;
+                   background:rgba(255,255,255,.3);align-items:center;justify-content:center;
+                   font-size:.7rem;margin-right:6px">{{ n }}</span>{{ lbl }}
+    </div>
+    {% endfor %}
+  </div>
+
+  <form method="POST" action="{{ url_for('lab.register_order') }}" id="labForm">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input type="hidden" name="patient_id" id="patient_id_field" required>
+
+  <div class="row g-3">
+    <!-- LEFT COLUMN: Patient + Tests -->
+    <div class="col-lg-8">
+
+      <!-- Stage 1: Patient Details -->
+      <div class="mc-card" id="stage1">
+        <div class="mc-card-header" style="background:#f5f0ff">
+          <span style="width:22px;height:22px;border-radius:50%;background:#3d1a78;
+                       color:#fff;display:inline-flex;align-items:center;justify-content:center;
+                       font-size:.7rem;font-weight:800">1</span>
+          <span style="color:#3d1a78">Patient Details</span>
+        </div>
+        <div class="mc-card-body">
+          <div class="row g-3">
+            <div class="col-md-8">
+              <label class="mc-label required">Patient</label>
+              <div class="position-relative">
+                <input type="text" id="patient_search" class="form-control"
+                       placeholder="Search by name, UHID or phone…"
+                       autocomplete="off">
+                <div id="patient_dropdown"
+                     style="display:none;position:absolute;top:100%;left:0;right:0;
+                            background:#fff;border:1px solid var(--border);border-radius:8px;
+                            box-shadow:0 4px 12px rgba(0,0,0,.1);z-index:1050;
+                            max-height:220px;overflow-y:auto"></div>
+              </div>
+              <!-- Patient info strip after selection -->
+              <div id="patient_strip"
+                   style="display:none;margin-top:8px;padding:8px 12px;
+                          background:#f5f0ff;border-radius:6px;font-size:.8rem;
+                          border:1px solid var(--border)">
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                  <i class="bi bi-person-check" style="color:#5b21b6"></i>
+                  <strong id="strip_name"></strong>
+                  <span style="background:#ede9fe;color:#5b21b6;padding:1px 8px;
+                               border-radius:6px;font-size:.7rem;font-family:monospace"
+                        id="strip_uhid"></span>
+                  <span class="text-muted" id="strip_age"></span>
+                  <span class="text-muted" id="strip_phone"></span>
+                  <button type="button" class="btn btn-sm btn-outline-secondary ms-auto"
+                          style="font-size:.7rem;padding:2px 8px"
+                          onclick="clearPatient()">Change</button>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <label class="mc-label">Visit Type</label>
+              <select name="visit_type" class="form-select">
+                <option value="op">Out Patient (OP)</option>
+                <option value="ip">In Patient (IP)</option>
+                <option value="walkin">Walk-in</option>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="mc-label">Referring Doctor</label>
+              <select name="doctor_id" class="form-select">
+                <option value="">— Select —</option>
+                {% for d in doctors %}
+                <option value="{{ d.id }}">
+                  {{ d.title or 'Dr.' }} {{ d.full_name }}
+                  {% if d.specialisation %} ({{ d.specialisation }}){% endif %}
+                </option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-3">
+              <label class="mc-label">Priority</label>
+              <select name="priority" id="priority_sel" class="form-select">
+                <option value="routine">Routine</option>
+                <option value="urgent">Urgent</option>
+                <option value="stat">STAT</option>
+              </select>
+            </div>
+            <div class="col-md-3">
+              <label class="mc-label">Order Date</label>
+              <input type="date" class="form-control" value="{{ today.isoformat() }}" disabled
+                     style="background:#f5f0ff">
+            </div>
+            <div class="col-12">
+              <label class="mc-label">Clinical Information</label>
+              <input type="text" name="clinical_info" class="form-control"
+                     placeholder="Brief clinical notes for lab technician…">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Stage 2: Test Selection -->
+      <div class="mc-card" id="stage2">
+        <div class="mc-card-header" style="background:#f5f0ff">
+          <span style="width:22px;height:22px;border-radius:50%;background:#3d1a78;
+                       color:#fff;display:inline-flex;align-items:center;justify-content:center;
+                       font-size:.7rem;font-weight:800">2</span>
+          <span style="color:#3d1a78">Test Selection</span>
+          <span class="badge ms-2" style="background:#5b21b6;color:#fff" id="sel_count">
+            0 selected
+          </span>
+        </div>
+        <div class="mc-card-body">
+          <!-- Search + category filter -->
+          <div class="d-flex gap-2 mb-3 flex-wrap">
+            <input type="text" id="test_search"
+                   class="form-control form-control-sm"
+                   placeholder="Search test name or code…"
+                   style="max-width:220px">
+            <select id="cat_filter" class="form-select form-select-sm" style="width:160px">
+              <option value="">All Categories</option>
+              {% for cat in categories %}
+              <option value="{{ cat.id }}">{{ cat.name }}</option>
+              {% endfor %}
+            </select>
+            <span class="text-muted small align-self-center">
+              {{ tests|length }} tests available
+            </span>
+          </div>
+
+          <!-- Test grid -->
+          <div id="test_grid"
+               style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));
+                      gap:8px;max-height:380px;overflow-y:auto">
+            {% for test in tests %}
+            <label class="test-card" id="tc-{{ test.id }}"
+                   data-cat="{{ test.category_id or '' }}"
+                   data-name="{{ test.test_name|lower }}"
+                   data-code="{{ (test.test_code or '')|lower }}">
+              <input type="checkbox" name="test_id[]" value="{{ test.id }}"
+                     class="test-cb" style="accent-color:#5b21b6;margin-top:2px;flex-shrink:0"
+                     data-price="{{ test.price or 0 }}"
+                     data-gst="{{ test.gst_percent or 0 }}"
+                     data-name="{{ test.test_name }}"
+                     data-code="{{ test.test_code or '' }}"
+                     data-sample="{{ test.sample_type or '' }}">
+              <div>
+                <div style="font-size:.8rem;font-weight:600;color:#374151">
+                  {{ test.test_name }}
+                </div>
+                <div style="font-size:.68rem;color:#6b7280;margin-top:1px">
+                  {% if test.test_code %}
+                  <span style="background:#ede9fe;color:#5b21b6;padding:0 5px;
+                               border-radius:4px;font-family:monospace;font-size:.62rem">
+                    {{ test.test_code }}
+                  </span>
+                  {% endif %}
+                  {{ test.sample_type or '' }}
+                  {% if test.turnaround_hrs %} · {{ test.turnaround_hrs }}h{% endif %}
+                </div>
+                <div style="font-size:.78rem;color:#5b21b6;font-weight:700;margin-top:3px">
+                  ₹{{ "{:.2f}".format(test.price or 0) }}
+                </div>
+              </div>
+            </label>
+            {% else %}
+            <div style="grid-column:1/-1;text-align:center;color:#6b7280;padding:24px">
+              No tests configured.
+              <a href="{{ url_for('lab.index', tab='settings') }}">
+                Add tests in Settings →
+              </a>
+            </div>
+            {% endfor %}
+          </div>
+
+          <!-- Selected tests chips -->
+          <div id="selected_area" style="display:none;margin-top:12px">
+            <div style="font-size:.75rem;font-weight:600;color:#3d1a78;margin-bottom:6px">
+              Selected Tests:
+            </div>
+            <div id="selected_chips" class="d-flex flex-wrap gap-1"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT COLUMN: Payment (Stage 3) -->
+    <div class="col-lg-4">
+      <div class="mc-card" style="position:sticky;top:16px">
+        <div class="mc-card-header" style="background:#f5f0ff">
+          <span style="width:22px;height:22px;border-radius:50%;background:#3d1a78;
+                       color:#fff;display:inline-flex;align-items:center;justify-content:center;
+                       font-size:.7rem;font-weight:800">3</span>
+          <span style="color:#3d1a78">Payment</span>
+        </div>
+        <div class="mc-card-body">
+
+          <!-- Bill lines -->
+          <div style="background:#f8fafc;border-radius:8px;padding:12px;margin-bottom:14px;
+                      min-height:80px">
+            <div id="bill_lines" style="font-size:.78rem">
+              <div class="text-muted text-center py-2">Select tests to see bill…</div>
+            </div>
+            <hr style="margin:8px 0;border-color:#e9d5ff">
+            <div class="d-flex justify-content-between" style="font-weight:700;font-size:.88rem">
+              <span>Total</span>
+              <span style="color:#3d1a78" id="grand_total">₹0.00</span>
+            </div>
+          </div>
+
+          <!-- Payment mode -->
+          <div class="mb-3">
+            <label class="mc-label">Payment Mode</label>
+            <div class="row g-1">
+              {% for mode, lbl in [('cash','Cash'),('upi','UPI/GPay'),
+                 ('card','Card'),('bank_transfer','Bank Transfer'),('credit','Credit')] %}
+              <div class="col-6">
+                <div class="form-check" style="margin:0">
+                  <input class="form-check-input" type="radio" name="payment_mode"
+                         value="{{ mode }}" id="pm_{{ mode }}"
+                         {% if mode == 'cash' %}checked{% endif %}
+                         style="accent-color:#5b21b6">
+                  <label class="form-check-label" style="font-size:.78rem" for="pm_{{ mode }}">
+                    {{ lbl }}
+                  </label>
+                </div>
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label class="mc-label">Amount Paid (₹)</label>
+            <input type="number" name="paid_amount" id="paid_amount"
+                   class="form-control" step="0.01" value="0"
+                   style="font-size:1.1rem;font-weight:700;color:#3d1a78">
+          </div>
+
+          <!-- Balance display -->
+          <div class="d-flex justify-content-between align-items-center mb-4"
+               style="padding:8px 12px;background:#fff5f5;border-radius:6px">
+            <span style="font-size:.8rem;color:#6b7280">Balance Due</span>
+            <span style="font-weight:800;font-size:1rem;color:#dc2626"
+                  id="balance_display">₹0.00</span>
+          </div>
+
+          <!-- Submit -->
+          <button type="submit" class="btn w-100 py-2 mb-2"
+                  style="background:#3d1a78;color:#fff;border:none;font-weight:700">
+            <i class="bi bi-check-circle me-1"></i>Register & Generate Order
+          </button>
+          <a href="{{ url_for('lab.index', tab='registration') }}"
+             class="btn btn-outline-secondary w-100">Cancel</a>
+
+        </div>
+      </div>
+    </div>
+  </div>
+  </form>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+// ── Patient search ────────────────────────────────────────────────
+let searchTimer;
+const searchInput  = document.getElementById('patient_search');
+const dropdown     = document.getElementById('patient_dropdown');
+const patientField = document.getElementById('patient_id_field');
+
+searchInput.addEventListener('input', function() {
+  clearTimeout(searchTimer);
+  const q = this.value.trim();
+  if (q.length < 2) { dropdown.style.display='none'; return; }
+  searchTimer = setTimeout(() => {
+    fetch('/lab/patient-search?q=' + encodeURIComponent(q))
+      .then(r => r.json())
+      .then(pts => {
+        if (!pts.length) {
+          dropdown.innerHTML = '<div class="patient-result text-muted">No patients found.</div>';
+        } else {
+          dropdown.innerHTML = pts.map(p => `
+            <div class="patient-result" onclick="selectPatient(${p.id},'${p.name}',
+              '${p.uhid}','${p.age}','${p.gender}','${p.phone}')">
+              <div style="font-weight:600">${p.name}
+                <span style="background:#ede9fe;color:#5b21b6;padding:1px 6px;
+                             border-radius:4px;font-size:.65rem;font-family:monospace">
+                  ${p.uhid}
+                </span>
+              </div>
+              <div style="color:#6b7280;font-size:.72rem">
+                ${p.age ? p.age+'y' : ''} ${p.gender || ''} | ${p.phone}
+              </div>
+            </div>`).join('');
+        }
+        dropdown.style.display = 'block';
+      });
+  }, 300);
+});
+
+document.addEventListener('click', e => {
+  if (!searchInput.contains(e.target) && !dropdown.contains(e.target))
+    dropdown.style.display = 'none';
+});
+
+function selectPatient(id, name, uhid, age, gender, phone) {
+  patientField.value = id;
+  searchInput.style.display = 'none';
+  dropdown.style.display    = 'none';
+  document.getElementById('strip_name').textContent  = name;
+  document.getElementById('strip_uhid').textContent  = uhid;
+  document.getElementById('strip_age').textContent   = (age ? age+'y' : '') + (gender ? ' / '+gender : '');
+  document.getElementById('strip_phone').textContent = phone;
+  document.getElementById('patient_strip').style.display = 'block';
+  // Activate stage 2 pill
+  document.getElementById('stage-pill-2').className = 'stage-pill stage-active';
+}
+
+function clearPatient() {
+  patientField.value = '';
+  searchInput.value  = '';
+  searchInput.style.display = '';
+  document.getElementById('patient_strip').style.display = 'none';
+  document.getElementById('stage-pill-2').className = 'stage-pill stage-idle';
+}
+
+// ── Test selection ────────────────────────────────────────────────
+let selectedTests = {};
+
+document.querySelectorAll('.test-cb').forEach(cb => {
+  cb.addEventListener('change', function() {
+    const card = this.closest('.test-card');
+    if (this.checked) {
+      selectedTests[this.value] = {
+        name: this.dataset.name,
+        price: parseFloat(this.dataset.price) || 0,
+        gst: parseFloat(this.dataset.gst) || 0,
+      };
+      card.classList.add('selected');
+      card.style.borderColor = '#5b21b6';
+    } else {
+      delete selectedTests[this.value];
+      card.classList.remove('selected');
+      card.style.borderColor = '';
+    }
+    updateBill();
+  });
+});
+
+function updateBill() {
+  const keys = Object.keys(selectedTests);
+  document.getElementById('sel_count').textContent = keys.length + ' selected';
+
+  let total = 0;
+  let html  = '';
+  keys.forEach(k => {
+    const t = selectedTests[k];
+    const gstAmt = t.price * t.gst / 100;
+    const lineTotal = t.price + gstAmt;
+    html += `<div class="d-flex justify-content-between mb-1">
+      <span style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+        ${t.name}
+      </span>
+      <span>₹${lineTotal.toFixed(2)}</span>
+    </div>`;
+    total += lineTotal;
+  });
+
+  document.getElementById('bill_lines').innerHTML = html ||
+    '<div class="text-muted text-center py-2">Select tests to see bill…</div>';
+  document.getElementById('grand_total').textContent = '₹' + total.toFixed(2);
+
+  // Auto-fill paid amount if still 0
+  const paidEl = document.getElementById('paid_amount');
+  if (parseFloat(paidEl.value) === 0) paidEl.value = total.toFixed(2);
+  updateBalance();
+
+  // Chips
+  const chips = keys.map(k =>
+    `<span style="background:#ede9fe;color:#5b21b6;padding:3px 10px;border-radius:20px;
+                  font-size:.7rem;font-weight:600">${selectedTests[k].name}</span>`
+  ).join('');
+  document.getElementById('selected_chips').innerHTML = chips;
+  document.getElementById('selected_area').style.display = keys.length ? 'block' : 'none';
+
+  // Stage 3 pill
+  if (keys.length > 0)
+    document.getElementById('stage-pill-3').className = 'stage-pill stage-active';
+}
+
+function updateBalance() {
+  const total = Object.values(selectedTests).reduce((s,t) => {
+    return s + t.price + (t.price * t.gst / 100);
+  }, 0);
+  const paid  = parseFloat(document.getElementById('paid_amount').value) || 0;
+  const bal   = Math.max(0, total - paid);
+  document.getElementById('balance_display').textContent = '₹' + bal.toFixed(2);
+}
+
+document.getElementById('paid_amount').addEventListener('input', updateBalance);
+
+// ── Search & category filter ──────────────────────────────────────
+document.getElementById('test_search').addEventListener('input', filterTests);
+document.getElementById('cat_filter').addEventListener('change', filterTests);
+
+function filterTests() {
+  const q   = document.getElementById('test_search').value.toLowerCase();
+  const cat = document.getElementById('cat_filter').value;
+  document.querySelectorAll('.test-card').forEach(c => {
+    const matchQ   = !q   || c.dataset.name.includes(q) || c.dataset.code.includes(q);
+    const matchCat = !cat || c.dataset.cat == cat;
+    c.style.display = (matchQ && matchCat) ? '' : 'none';
+  });
+}
+
+// ── Priority colour indicator ─────────────────────────────────────
+document.getElementById('priority_sel').addEventListener('change', function() {
+  const colors = {stat:'#dc2626', urgent:'#d97706', routine:''};
+  this.style.borderColor = colors[this.value] || '';
+  this.style.color       = colors[this.value] || '';
+});
+</script>
+</body>
+</html>
