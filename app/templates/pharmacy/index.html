@@ -88,7 +88,12 @@
   {% if drugs.pages > 1 %}
   <div class="mc-pager">
     <span>{{ drugs.total }} drugs</span>
-    <nav><ul class="pagination pagination-sm mb-0"><li class="page-item {% if not drugs.has_prev %}disabled{% endif %}"><a class="page-link" href="{{ url_for('pharmacy.index', tab='drugs', page=drugs.prev_num, q=search) }}">‹</a></li>{% for p in drugs.iter_pages() %}{% if p %}<li class="page-item {% if p==drugs.page %}active{% endif %}"><a class="page-link" href="{{ url_for('pharmacy.index', tab='drugs', page=p, q=search) }}">{{ p }}</a></li>{% endif %}{% endfor %}<li class="page-item {% if not drugs.has_next %}disabled{% endif %}"><a class="page-link" href="{{ url_for('pharmacy.index', tab='drugs', page=drugs.next_num, q=search) }}">›</a></li></ul></nav>
+    <nav><ul class="pagination pagination-sm mb-0" id="drugsPager"
+      data-base="{{ url_for('pharmacy.index', tab='drugs') }}"
+      data-has-prev="{{ drugs.has_prev|int }}" data-prev-num="{{ drugs.prev_num or '' }}"
+      data-has-next="{{ drugs.has_next|int }}" data-next-num="{{ drugs.next_num or '' }}"
+      data-current="{{ drugs.page }}" data-pages="{{ drugs.iter_pages()|list|tojson }}"
+      data-q="{{ search or '' }}"></ul></nav>
   </div>
   {% endif %}
 </div>
@@ -477,6 +482,31 @@
 
 {% block scripts %}
 <script>
+// Drug list pagination — built client-side so the <ul> has no server-rendered
+// <li> text nodes in the source template (only data-* attributes on the <ul>).
+(function () {
+  const pager = document.getElementById('drugsPager');
+  if (!pager) return;
+  const base    = pager.dataset.base;
+  const q       = pager.dataset.q;
+  const current = parseInt(pager.dataset.current, 10);
+  const pages   = JSON.parse(pager.dataset.pages);
+  const linkFor = page => `${base}?page=${page}&q=${encodeURIComponent(q)}`;
+  const makeItem = (label, page, { disabled = false, active = false } = {}) => {
+    const li = document.createElement('li');
+    li.className = 'page-item' + (disabled ? ' disabled' : '') + (active ? ' active' : '');
+    const a = document.createElement('a');
+    a.className = 'page-link';
+    a.href = disabled ? '#' : linkFor(page);
+    a.textContent = label;
+    li.appendChild(a);
+    return li;
+  };
+  pager.appendChild(makeItem('‹', pager.dataset.prevNum, { disabled: pager.dataset.hasPrev !== '1' }));
+  pages.forEach(p => { if (p) pager.appendChild(makeItem(p, p, { active: p === current })); });
+  pager.appendChild(makeItem('›', pager.dataset.nextNum, { disabled: pager.dataset.hasNext !== '1' }));
+})();
+
 // Edit drug - populate modal
 document.querySelectorAll('.edit-drug-btn').forEach(btn => {
   btn.addEventListener('click', function() {
