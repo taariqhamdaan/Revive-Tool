@@ -510,7 +510,7 @@ const drugSelect = `<select name="po_drug_id[]" class="form-select form-select-s
 function mkDrugSelect(nameAttr) {
   return `<select name="${nameAttr}" class="form-select form-select-sm" required>
     <option value="">— Select Drug —</option>
-    {% for d in drugs.items if drugs else [] %}
+    {% for d in (drugs.items if drugs else []) %}
     <option value="{{ d.id }}" data-rate="{{ d.purchase_rate or 0 }}" data-mrp="{{ d.mrp or 0 }}" data-stock="{{ d.current_stock or 0 }}">{{ d.generic_name }}{% if d.brand_name %} ({{ d.brand_name }}){% endif %} — Stock: {{ d.current_stock or 0 }}</option>
     {% endfor %}
   </select>`;

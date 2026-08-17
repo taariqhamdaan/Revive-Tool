@@ -58,6 +58,9 @@ def create_app():
 
     babel.init_app(app, locale_selector=get_locale)
 
+    # Jinja has no built-in enumerate(); templates (e.g. payroll/index.html) use it.
+    app.jinja_env.globals["enumerate"] = enumerate
+
     # ── Register Blueprints ───────────────────────────────────────────────
     _register_blueprints(app)
 
