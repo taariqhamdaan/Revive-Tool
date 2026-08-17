@@ -1,4 +1,4 @@
-# Revive - Requirements
+# Rivive - Requirements
 # Python 3.10+
 
 # Core Framework

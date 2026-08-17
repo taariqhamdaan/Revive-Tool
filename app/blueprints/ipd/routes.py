@@ -1,4 +1,4 @@
-# Revive - app/blueprints/ipd/routes.py
+# Rivive - app/blueprints/ipd/routes.py
 # IPD: Ward/Bed management, Admissions, Daily notes, Discharge summaries.
 # Logic summary per tab:
 #   beds       — ward and bed master, bed status board (visual occupancy grid)

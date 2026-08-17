@@ -1,4 +1,4 @@
-# Revive - app/models/patients.py
+# Rivive - app/models/patients.py
 # Patient master data. UHID (Unique Health ID) is auto-generated per branch.
 # Sensitive fields (Aadhaar) are encrypted at application level.
 

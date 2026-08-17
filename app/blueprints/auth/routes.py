@@ -1,4 +1,4 @@
-# Revive - app/blueprints/auth/routes.py
+# Rivive - app/blueprints/auth/routes.py
 # Authentication: login, logout, password reset, language toggle, profile.
 # Logic summary:
 #   - Login: validate credentials, check lockout, record session, audit log

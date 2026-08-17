@@ -1,4 +1,4 @@
-# Revive - app/models/radiology.py
+# Rivive - app/models/radiology.py
 # Radiology: Investigation master, orders, reports.
 
 from datetime import datetime, timezone

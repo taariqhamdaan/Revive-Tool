@@ -1,4 +1,4 @@
-# Revive - app/models/foundation.py
+# Rivive - app/models/foundation.py
 # Foundation tables: Branches, Departments, Designations, SystemSettings, EmailTemplates
 # These are the root reference tables that everything else depends on.
 

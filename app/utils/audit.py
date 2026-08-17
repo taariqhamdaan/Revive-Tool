@@ -1,4 +1,4 @@
-# Revive - app/utils/audit.py
+# Rivive - app/utils/audit.py
 # Utility to write audit log entries from anywhere in the application.
 # Call log_action() after any CREATE / UPDATE / DELETE operation.
 

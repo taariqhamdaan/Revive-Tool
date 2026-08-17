@@ -1,4 +1,4 @@
-# Revive - app/__init__.py
+# Rivive - app/__init__.py
 # Application factory. Creates and configures the Flask app.
 # All blueprints, extensions, and middleware are registered here.
 
@@ -92,7 +92,7 @@ def create_app():
         from flask_login import current_user
         from datetime import datetime
         return {
-            "app_name": app.config.get("APP_NAME", "Revive"),
+            "app_name": app.config.get("APP_NAME", "Rivive"),
             "current_user": current_user,
             "now": datetime.now(),
             "today": datetime.today().date(),
@@ -158,7 +158,7 @@ def _setup_logging(app):
     if not app.debug:
         try:
             handler = RotatingFileHandler(
-                "logs/revive.log",
+                "logs/rivive.log",
                 maxBytes=5 * 1024 * 1024,  # 5 MB per file
                 backupCount=10,
             )
@@ -169,7 +169,7 @@ def _setup_logging(app):
             handler.setFormatter(formatter)
             app.logger.addHandler(handler)
             app.logger.setLevel(logging.INFO)
-            app.logger.info("Revive startup complete.")
+            app.logger.info("Rivive startup complete.")
         except OSError:
             app.logger.setLevel(logging.INFO)
 

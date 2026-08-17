@@ -1,4 +1,4 @@
-/* Revive JS v2.0 — Rivive design aligned */
+/* Rivive JS v2.0 — Rivive design aligned */
 
 document.addEventListener('DOMContentLoaded', function () {
 

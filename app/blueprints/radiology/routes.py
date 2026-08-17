@@ -1,4 +1,4 @@
-# Revive - app/blueprints/radiology/routes.py
+# Rivive - app/blueprints/radiology/routes.py
 # Radiology: Investigation master, orders, report entry.
 
 from datetime import date, datetime, timezone

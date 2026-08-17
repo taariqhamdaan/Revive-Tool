@@ -1,4 +1,4 @@
-# Revive - app/models/payroll.py
+# Rivive - app/models/payroll.py
 # Payroll: Salary structure components, payroll run master, payroll line items.
 # Supports earnings (Basic, HRA, DA, Allowances) and deductions (PF, ESI, TDS, LOP).
 

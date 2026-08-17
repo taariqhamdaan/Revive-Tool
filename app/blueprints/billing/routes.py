@@ -1,4 +1,4 @@
-# Revive - app/blueprints/billing/routes.py
+# Rivive - app/blueprints/billing/routes.py
 # Billing — Rivive Hospital PDF design.
 # Sub-tabs: Bill Summary, Credit Bills, Saved Bills, Overall Bills,
 #           Detailed Receipt Bills, Expense Bills, Insurance Patient

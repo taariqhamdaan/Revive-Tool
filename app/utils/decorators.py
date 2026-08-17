@@ -1,4 +1,4 @@
-# Revive - app/utils/decorators.py
+# Rivive - app/utils/decorators.py
 # Custom decorators for route-level permission enforcement.
 # Usage: @require_permission("patients", "create")
 

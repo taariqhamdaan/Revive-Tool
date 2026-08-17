@@ -1,4 +1,4 @@
-# Revive - extensions.py
+# Rivive - extensions.py
 # All Flask extensions are initialised here without the app object.
 # The app is passed in via init_app() inside create_app() in __init__.py
 # This avoids circular imports across blueprints.

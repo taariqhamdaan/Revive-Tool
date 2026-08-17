@@ -1,4 +1,4 @@
-# Revive - app/utils/generators.py
+# Rivive - app/utils/generators.py
 # Auto-generation of all system IDs: UHID, IP number, bill number, etc.
 # All generators are branch-scoped and zero-padded for consistent sorting.
 

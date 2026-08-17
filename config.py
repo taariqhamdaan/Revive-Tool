@@ -1,4 +1,4 @@
-# Revive - config.py
+# Rivive - config.py
 # Environment-based configuration. Reads from .env file.
 
 import os
@@ -18,7 +18,7 @@ class Config:
 
     # ── Database ──────────────────────────────────────────────────────────
     SQLALCHEMY_DATABASE_URI = os.environ.get(
-        "DATABASE_URL", "postgresql://revive_user:password@localhost:5432/revive_db"
+        "DATABASE_URL", "postgresql://rivive_user:password@localhost:5432/rivive_db"
     )
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_ENGINE_OPTIONS = {
@@ -41,7 +41,7 @@ class Config:
     MAIL_USE_TLS = os.environ.get("MAIL_USE_TLS", "1") == "1"
     MAIL_USERNAME = os.environ.get("MAIL_USERNAME")
     MAIL_PASSWORD = os.environ.get("MAIL_PASSWORD")
-    MAIL_DEFAULT_SENDER = os.environ.get("MAIL_DEFAULT_SENDER", "Revive <noreply@revive.local>")
+    MAIL_DEFAULT_SENDER = os.environ.get("MAIL_DEFAULT_SENDER", "Rivive <noreply@rivive.local>")
     # No SMTP credentials configured yet — suppress sends instead of failing
     # at connect time. Set to "0" once MAIL_USERNAME/MAIL_PASSWORD are real.
     MAIL_SUPPRESS_SEND = os.environ.get("MAIL_SUPPRESS_SEND", "1") == "1"

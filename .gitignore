@@ -16,7 +16,7 @@ instance/
 *.sqlite3
 rivive.db
 
-# Revive local runtime dirs
+# Rivive local runtime dirs
 logs/
 uploads/
 exports/

@@ -1,4 +1,4 @@
-# Revive - app/blueprints/lab/routes.py
+# Rivive - app/blueprints/lab/routes.py
 # Laboratory: test master, panels, lab orders, sample collection,
 # result entry, result verification, report generation.
 # Logic summary per tab:

@@ -1,4 +1,4 @@
-# Revive - app/models/billing.py
+# Rivive - app/models/billing.py
 # Billing: Bill master, bill items, payments, receipts, credit notes,
 # insurance claims, TPA master. All monetary values in INR (Decimal 12,2).
 

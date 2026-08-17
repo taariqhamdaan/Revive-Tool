@@ -1,4 +1,4 @@
-# Revive - app/blueprints/insurance/routes.py
+# Rivive - app/blueprints/insurance/routes.py
 # Insurance & TPA: TPA master, pre-auth, claim tracking, settlement.
 
 from datetime import date, datetime, timezone

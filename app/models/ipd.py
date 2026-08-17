@@ -1,4 +1,4 @@
-# Revive - app/models/ipd.py
+# Rivive - app/models/ipd.py
 # Inpatient Department: Wards, Beds, Admissions, Daily Notes, Discharge Summaries.
 
 from datetime import datetime, timezone

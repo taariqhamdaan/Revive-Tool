@@ -1,4 +1,4 @@
-# Revive - app/models/users.py
+# Rivive - app/models/users.py
 # User authentication, role-based access control, sessions, audit.
 # Roles are assigned per branch. SuperAdmin bypasses all permission checks.
 

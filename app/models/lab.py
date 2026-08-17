@@ -1,4 +1,4 @@
-# Revive - app/models/lab.py
+# Rivive - app/models/lab.py
 # Laboratory: Test master, panels, sample collection, results, report templates.
 
 from datetime import datetime, timezone

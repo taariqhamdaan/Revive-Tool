@@ -1,4 +1,4 @@
-# Revive - app/models/__init__.py
+# Rivive - app/models/__init__.py
 # Import all models so Flask-Migrate/SQLAlchemy can discover all tables.
 # Order matters — base models before dependent ones.
 

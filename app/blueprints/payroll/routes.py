@@ -1,4 +1,4 @@
-# Revive - app/blueprints/payroll/routes.py
+# Rivive - app/blueprints/payroll/routes.py
 # Payroll: salary components, structures, monthly run, payslip generation.
 
 from datetime import date, datetime, timezone

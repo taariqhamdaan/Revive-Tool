@@ -1,4 +1,4 @@
-# Revive - app/models/pharmacy.py
+# Rivive - app/models/pharmacy.py
 # Pharmacy: Drug master, categories, suppliers, purchase orders,
 # GRN (Goods Received Note), stock ledger, dispensing.
 

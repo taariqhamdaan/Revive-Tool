@@ -1,4 +1,4 @@
-# Revive - app/models/base.py
+# Rivive - app/models/base.py
 # Abstract base model. Every table inherits from this.
 # Provides: id, branch_id, created_at, updated_at, created_by, is_deleted (soft delete)
 
@@ -8,7 +8,7 @@ from app.extensions import db
 
 class BaseModel(db.Model):
     """
-    Abstract base — all Revive tables inherit this.
+    Abstract base — all Rivive tables inherit this.
     Soft delete: records are never hard-deleted (medical compliance).
     """
     __abstract__ = True

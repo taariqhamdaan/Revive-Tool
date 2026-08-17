@@ -1,4 +1,4 @@
-# Revive - app/blueprints/pharmacy/routes.py
+# Rivive - app/blueprints/pharmacy/routes.py
 # Pharmacy: Drug master, categories, suppliers, purchase orders,
 # GRN, stock ledger, dispensing, expiry alerts, bulk upload.
 # Logic summary per tab:
