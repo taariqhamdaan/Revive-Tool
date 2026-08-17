@@ -680,3 +680,11 @@ textarea.form-control { resize: vertical; min-height: 72px; }
 /* ── Pharmacy inline-style extractions ───────────────────────────────────── */
 .mc-search-input { max-width: 300px; }
 .mc-patient-results { display: none; z-index: 2000; max-height: 200px; overflow-y: auto; }
+
+/* ── Billing inline-style extractions ────────────────────────────────────── */
+.mc-filter-date { width: 150px; }
+.mc-stat-val-sm { font-size: 1.1rem; }
+.mc-table-compact { font-size: .82rem; }
+.mc-denom-count { width: 80px; }
+.mc-bg-soft { background: #f8fafc; }
+.mc-dl-compact { font-size: .85rem; }

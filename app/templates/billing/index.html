@@ -24,10 +24,10 @@
   <div class="mc-card-body py-2">
     <form method="GET" class="d-flex gap-2 align-items-center flex-wrap">
       <input type="hidden" name="tab" value="{{ tab }}">
-      <label class="mc-label mb-0">From</label>
-      <input type="date" name="date_from" class="form-control form-control-sm" value="{{ date_from }}" style="width:150px">
-      <label class="mc-label mb-0">To</label>
-      <input type="date" name="date_to" class="form-control form-control-sm" value="{{ date_to }}" style="width:150px">
+      <label class="mc-label mb-0" for="billingDateFrom">From</label>
+      <input type="date" name="date_from" id="billingDateFrom" class="form-control form-control-sm mc-filter-date" value="{{ date_from }}">
+      <label class="mc-label mb-0" for="billingDateTo">To</label>
+      <input type="date" name="date_to" id="billingDateTo" class="form-control form-control-sm mc-filter-date" value="{{ date_to }}">
       <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-search me-1"></i>Filter</button>
       <button type="button" class="btn btn-outline-secondary btn-sm no-print" data-print>
         <i class="bi bi-printer me-1"></i>Print
@@ -50,7 +50,7 @@
     <div class="mc-stat">
       <div class="mc-stat-icon {{ color }}"><i class="bi bi-{{ icon }}"></i></div>
       <div>
-        <div class="mc-stat-val" style="font-size:1.1rem">{{ val }}</div>
+        <div class="mc-stat-val mc-stat-val-sm">{{ val }}</div>
         <div class="mc-stat-lbl">{{ label }}</div>
       </div>
     </div>
@@ -149,13 +149,13 @@
   <div class="mc-card-body">
     <div class="row g-3 align-items-center">
       <div class="col-md-6">
-        <table class="table table-sm table-bordered mb-0" style="font-size:.82rem">
+        <table class="table table-sm table-bordered mb-0 mc-table-compact">
           <thead class="table-light"><tr><th>Denomination</th><th>Count</th><th>Amount</th></tr></thead>
           <tbody>
             {% for denom in [2000,500,200,100,50,20,10,5,2,1] %}
             <tr>
               <td>₹{{ denom }}</td>
-              <td><input type="number" class="form-control form-control-sm denom-count" data-val="{{ denom }}" min="0" value="0" style="width:80px"></td>
+              <td><input type="number" class="form-control form-control-sm denom-count mc-denom-count" data-val="{{ denom }}" min="0" value="0" aria-label="Count of ₹{{ denom }} notes"></td>
               <td class="denom-amt text-end fw-semibold">₹0</td>
             </tr>
             {% endfor %}
@@ -166,9 +166,9 @@
         </table>
       </div>
       <div class="col-md-6">
-        <div class="mc-card" style="background:#f8fafc">
+        <div class="mc-card mc-bg-soft">
           <div class="mc-card-body">
-            <dl class="row mb-0" style="font-size:.85rem">
+            <dl class="row mb-0 mc-dl-compact">
               <dt class="col-7">Cash Received Today</dt>
               <dd class="col-5 text-end fw-bold">₹{{ "{:,.2f}".format(stats.cash_received) }}</dd>
               <dt class="col-7">GPay / Card Received</dt>
@@ -179,7 +179,7 @@
               <dd class="col-5 text-end text-danger fw-bold">- ₹{{ "{:,.2f}".format(stats.refund) }}</dd>
               <hr>
               <dt class="col-7 fw-bold">Total Amount</dt>
-              <dd class="col-5 text-end fw-bold text-success" style="font-size:1.1rem">
+              <dd class="col-5 text-end fw-bold text-success mc-stat-val-sm">
                 ₹{{ "{:,.2f}".format(stats.cash_received + stats.gpay_received) }}
               </dd>
             </dl>
