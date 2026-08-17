@@ -5,6 +5,11 @@ radiology, billing, insurance, HR, payroll, reports and settings, built with
 Flask (application-factory pattern), Flask-SQLAlchemy, Flask-Login and
 PostgreSQL.
 
+## User guide
+
+A non-technical walkthrough — access links, login, hosting status, and a
+module-by-module reference — lives at [`docs/Revive-User-Guide.docx`](docs/Revive-User-Guide.docx).
+
 ## Local development
 
 ```powershell
