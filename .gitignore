@@ -33,3 +33,5 @@ Tool/
 
 # Migrations cache
 migrations/__pycache__/
+.vercel
+.env*
