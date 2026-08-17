@@ -10,9 +10,15 @@
   {% endfor %}
   <div class="ms-auto d-flex gap-2 pe-2 align-items-center">
     {% if current_user.has_permission('billing','create') %}
+    {% if tab == 'expense' %}
+    <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addExpenseModal">
+      <i class="bi bi-plus-circle me-1"></i>Add Expense
+    </button>
+    {% else %}
     <a href="{{ url_for('billing.new_bill') }}" class="btn btn-primary btn-sm">
       <i class="bi bi-plus-circle me-1"></i>New Bill
     </a>
+    {% endif %}
     {% endif %}
   </div>
 </div>
@@ -58,14 +64,65 @@
   {% endfor %}
 </div>
 
-<!-- Bills table -->
+<!-- Bills / receipts / expenses table -->
 <div class="mc-card">
   <div class="mc-card-header">
     <i class="bi bi-table"></i> {{ tab|replace('_',' ')|title }} Bills
-    <span class="badge bg-primary ms-2">{{ bills|length }}</span>
+    <span class="badge bg-primary ms-2">{{ (bills if tab not in ['detailed','expense'] else (payments if tab=='detailed' else expenses))|length }}</span>
   </div>
   <div class="mc-card-body p-0">
     <div class="mc-table-wrap">
+      {% if tab == 'detailed' %}
+      <table class="mc-table mc-datatable">
+        <thead><tr><th>Date & Time</th><th>Receipt/Bill No</th><th>Patient Details</th><th>Phone / UHID</th>
+          <th>Amount</th><th>Payment Mode</th><th>Reference No</th><th>Received By</th></tr></thead>
+        <tbody>
+          {% for p in payments %}
+          <tr>
+            <td class="small">{{ p.paid_at.strftime('%d-%m-%Y %H:%M') if p.paid_at else '—' }}</td>
+            <td><span class="mc-uhid">{{ p.bill.bill_number if p.bill else '—' }}</span></td>
+            <td>
+              <div class="fw-semibold">{{ p.patient.full_name if p.patient else '—' }}</div>
+              <div class="text-muted small">{{ p.patient.uhid if p.patient else '' }}</div>
+            </td>
+            <td class="small">{{ p.patient.phone if p.patient else '—' }}</td>
+            <td class="fw-semibold">₹{{ "{:,.2f}".format(p.amount or 0) }}</td>
+            <td class="small"><span class="mc-badge mc-badge-new">{{ p.payment_mode|replace('_',' ')|title }}</span></td>
+            <td class="small text-muted">{{ p.reference_no or '—' }}</td>
+            <td class="small text-muted">{{ p.receiver.full_name if p.receiver else '—' }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="8" class="text-center text-muted py-5">
+            <i class="bi bi-receipt display-6 d-block mb-2 opacity-25"></i>No receipts found for selected period.
+          </td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+      {% elif tab == 'expense' %}
+      <table class="mc-table mc-datatable">
+        <thead><tr><th>Date</th><th>Category</th><th>Payee</th><th>Description</th>
+          <th>Amount</th><th>Payment Mode</th><th>Reference No</th></tr></thead>
+        <tbody>
+          {% for e in expenses %}
+          <tr>
+            <td class="small">{{ e.expense_date.strftime('%d-%m-%Y') if e.expense_date else '—' }}</td>
+            <td><span class="mc-badge mc-badge-new">{{ e.category|title if e.category else '—' }}</span></td>
+            <td class="fw-semibold">{{ e.payee or '—' }}</td>
+            <td class="small text-muted">{{ e.description or '—' }}</td>
+            <td class="fw-semibold">₹{{ "{:,.2f}".format(e.amount or 0) }}</td>
+            <td class="small">{{ e.payment_mode|replace('_',' ')|title if e.payment_mode else '—' }}</td>
+            <td class="small text-muted">{{ e.reference_no or '—' }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="7" class="text-center text-muted py-5">
+            <i class="bi bi-cash-stack display-6 d-block mb-2 opacity-25"></i>No expenses recorded for selected period.
+          </td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+      {% else %}
       <table class="mc-table mc-datatable">
         <thead>
           <tr>
@@ -139,6 +196,7 @@
           {% endfor %}
         </tbody>
       </table>
+      {% endif %}
     </div>
   </div>
 </div>
@@ -177,7 +235,7 @@
               <dd class="col-5 text-end text-warning fw-bold">- ₹{{ "{:,.2f}".format(stats.discount) }}</dd>
               <dt class="col-7">Refunds</dt>
               <dd class="col-5 text-end text-danger fw-bold">- ₹{{ "{:,.2f}".format(stats.refund) }}</dd>
-              <hr>
+              <div class="col-12 mc-dl-divider"></div>
               <dt class="col-7 fw-bold">Total Amount</dt>
               <dd class="col-5 text-end fw-bold text-success mc-stat-val-sm">
                 ₹{{ "{:,.2f}".format(stats.cash_received + stats.gpay_received) }}
@@ -189,6 +247,42 @@
     </div>
   </div>
 </div>
+
+{# Add Expense Modal #}
+<div class="modal fade" id="addExpenseModal" tabindex="-1">
+<div class="modal-dialog"><div class="modal-content">
+<div class="modal-header"><h5 class="modal-title">Add Expense</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+<form method="POST" action="{{ url_for('billing.expense_save') }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+<div class="modal-body">
+  <div class="row g-3">
+    <div class="col-md-6"><label class="mc-label" for="expDate">Date</label><input type="date" name="expense_date" id="expDate" class="form-control" value="{{ today.isoformat() }}"></div>
+    <div class="col-md-6"><label class="mc-label" for="expCategory">Category</label>
+      <select name="category" id="expCategory" class="form-select">
+        <option value="">— Select —</option>
+        {% for c in ['Rent','Utilities','Supplies','Maintenance','Salary','Other'] %}<option value="{{ c|lower }}">{{ c }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="col-md-6"><label class="mc-label required" for="expPayee">Payee</label><input type="text" name="payee" id="expPayee" class="form-control" placeholder="Vendor / paid to" required></div>
+    <div class="col-md-6"><label class="mc-label required" for="expAmount">Amount (₹)</label><input type="number" name="amount" id="expAmount" class="form-control" step="0.01" min="0" required></div>
+    <div class="col-12"><label class="mc-label" for="expDescription">Description</label><input type="text" name="description" id="expDescription" class="form-control" placeholder="What was this expense for?"></div>
+    <div class="col-md-6"><label class="mc-label" for="expPaymentMode">Payment Mode</label>
+      <select name="payment_mode" id="expPaymentMode" class="form-select">
+        <option value="cash">Cash</option><option value="upi">UPI/GPay</option>
+        <option value="card">Card</option><option value="bank_transfer">Bank Transfer</option>
+        <option value="cheque">Cheque</option><option value="neft">NEFT</option>
+      </select>
+    </div>
+    <div class="col-md-6"><label class="mc-label" for="expReference">Reference No.</label><input type="text" name="reference_no" id="expReference" class="form-control" placeholder="Cheque no / txn ref"></div>
+    <div class="col-12"><label class="mc-label" for="expNotes">Notes</label><textarea name="notes" id="expNotes" class="form-control" rows="2"></textarea></div>
+  </div>
+</div>
+<div class="modal-footer">
+  <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+  <button type="submit" class="btn btn-primary">Save Expense</button>
+</div>
+</form>
+</div></div></div>
 {% endblock %}
 
 {% block scripts %}

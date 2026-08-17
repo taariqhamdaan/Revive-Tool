@@ -15,7 +15,7 @@ from flask_login import login_required, current_user
 from sqlalchemy import func
 
 from app.extensions import db
-from app.models.billing import BillMaster, BillItem, Payment, Receipt, CreditNote, InsuranceClaim, TPAMaster
+from app.models.billing import BillMaster, BillItem, Payment, Receipt, CreditNote, InsuranceClaim, TPAMaster, Expense
 from app.models.patients import Patient
 from app.models.foundation import Branch
 from app.utils.decorators import require_permission
@@ -38,12 +38,17 @@ def index():
     # Summary stats
     stats = _get_billing_stats(branch_id, date_from, date_to)
 
-    # Bills list per tab
-    bills = _get_bills_for_tab(tab, branch_id, date_from, date_to)
+    bills = payments = expenses = None
+    if tab == "detailed":
+        payments = _get_detailed_payments(branch_id, date_from, date_to)
+    elif tab == "expense":
+        expenses = _get_expenses(branch_id, date_from, date_to)
+    else:
+        bills = _get_bills_for_tab(tab, branch_id, date_from, date_to)
 
     return render_template("billing/index.html",
-                           tab=tab, bills=bills, stats=stats,
-                           today=today, date_from=date_from, date_to=date_to)
+                           tab=tab, bills=bills, payments=payments, expenses=expenses,
+                           stats=stats, today=today, date_from=date_from, date_to=date_to)
 
 
 def _get_billing_stats(branch_id, date_from, date_to):
@@ -63,7 +68,7 @@ def _get_billing_stats(branch_id, date_from, date_to):
         Payment.payment_mode=="cash", Payment.is_deleted==False, Payment.is_refunded==False,
         *([Payment.branch_id==branch_id] if branch_id else [])).scalar() or 0
     gpay_received = db.session.query(func.coalesce(func.sum(Payment.amount),0)).filter(
-        Payment.payment_mode.in_(["upi","card"]), Payment.is_deleted==False, Payment.is_refunded==False,
+        Payment.payment_mode.in_(["upi","card","bank_transfer","neft"]), Payment.is_deleted==False, Payment.is_refunded==False,
         *([Payment.branch_id==branch_id] if branch_id else [])).scalar() or 0
     discount      = db.session.query(func.coalesce(func.sum(BillMaster.discount_amount),0)).filter(
         BillMaster.is_deleted==False, *([BillMaster.branch_id==branch_id] if branch_id else [])).scalar() or 0
@@ -100,9 +105,34 @@ def _get_bills_for_tab(tab, branch_id, date_from, date_to):
     elif tab == "insurance":
         q = q.join(InsuranceClaim, InsuranceClaim.bill_id == BillMaster.id, isouter=True).filter(
             BillMaster.tpa_id != None)
-    # summary / overall / detailed — all bills
+    # summary / overall — all bills
 
     return q.order_by(BillMaster.bill_date.desc()).limit(200).all()
+
+
+def _get_detailed_payments(branch_id, date_from, date_to):
+    """Detailed Receipt Bills — one row per payment transaction, not per bill."""
+    q = Payment.query.filter(Payment.is_deleted == False)
+    if branch_id:
+        q = q.filter(Payment.branch_id == branch_id)
+    try:
+        q = q.filter(func.date(Payment.paid_at) >= date_from,
+                     func.date(Payment.paid_at) <= date_to)
+    except Exception:
+        pass
+    return q.order_by(Payment.paid_at.desc()).limit(200).all()
+
+
+def _get_expenses(branch_id, date_from, date_to):
+    q = Expense.query.filter(Expense.is_deleted == False)
+    if branch_id:
+        q = q.filter(Expense.branch_id == branch_id)
+    try:
+        q = q.filter(func.date(Expense.expense_date) >= date_from,
+                     func.date(Expense.expense_date) <= date_to)
+    except Exception:
+        pass
+    return q.order_by(Expense.expense_date.desc()).limit(200).all()
 
 
 @billing_bp.route("/new", methods=["GET","POST"])
@@ -208,6 +238,35 @@ def cancel_bill(bill_id):
                new_value={"status":"cancelled"})
     flash("Bill cancelled.","info")
     return redirect(url_for("billing.index"))
+
+
+@billing_bp.route("/expense/save", methods=["POST"])
+@login_required
+@require_permission("billing","create")
+def expense_save():
+    exp = Expense(
+        branch_id=current_user.branch_id,
+        category=request.form.get("category","").strip() or None,
+        payee=request.form.get("payee","").strip() or None,
+        description=request.form.get("description","").strip() or None,
+        amount=float(request.form.get("amount","0") or 0),
+        payment_mode=request.form.get("payment_mode","").strip() or None,
+        reference_no=request.form.get("reference_no","").strip() or None,
+        notes=request.form.get("notes","").strip() or None,
+        created_by=current_user.id,
+    )
+    exp_date = request.form.get("expense_date")
+    if exp_date:
+        try:
+            exp.expense_date = datetime.strptime(exp_date, "%Y-%m-%d")
+        except ValueError:
+            pass
+    db.session.add(exp)
+    db.session.commit()
+    log_action("CREATE","billing",record_id=exp.id,record_type="Expense",
+               new_value={"payee":exp.payee,"amount":float(exp.amount or 0)})
+    flash(f"Expense of ₹{exp.amount:,.2f} recorded.","success")
+    return redirect(url_for("billing.index", tab="expense"))
 
 
 @billing_bp.route("/bill/<int:bill_id>/print")

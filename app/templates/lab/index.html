@@ -32,8 +32,8 @@
 <div class="mc-card mb-3"><div class="mc-card-body py-2">
   <form method="GET" class="d-flex gap-2 flex-wrap align-items-center">
     <input type="hidden" name="tab" value="orders">
-    <input type="text" name="q" class="form-control form-control-sm" placeholder="Patient name / UHID / Order No…" value="{{ search or '' }}" style="max-width:260px">
-    <input type="date" name="date_filter" class="form-control form-control-sm" value="{{ date_filter }}" style="width:150px">
+    <input type="text" name="q" class="form-control form-control-sm mc-search-input-md" placeholder="Patient name / UHID / Order No…" value="{{ search or '' }}">
+    <input type="date" name="date_filter" class="form-control form-control-sm mc-filter-date" value="{{ date_filter }}" aria-label="Filter by date">
     <button type="submit" class="btn btn-primary btn-sm">Filter</button>
   </form>
 </div></div>
@@ -87,11 +87,12 @@
   {% if orders.pages > 1 %}
   <div class="mc-pager">
     <span>{{ orders.total }} orders</span>
-    <nav><ul class="pagination pagination-sm mb-0">
-      <li class="page-item {% if not orders.has_prev %}disabled{% endif %}"><a class="page-link" href="{{ url_for('lab.index', tab='orders', page=orders.prev_num, q=search, date_filter=date_filter) }}">‹</a></li>
-      {% for p in orders.iter_pages() %}{% if p %}<li class="page-item {% if p==orders.page %}active{% endif %}"><a class="page-link" href="{{ url_for('lab.index', tab='orders', page=p, q=search, date_filter=date_filter) }}">{{ p }}</a></li>{% endif %}{% endfor %}
-      <li class="page-item {% if not orders.has_next %}disabled{% endif %}"><a class="page-link" href="{{ url_for('lab.index', tab='orders', page=orders.next_num, q=search, date_filter=date_filter) }}">›</a></li>
-    </ul></nav>
+    <nav><ul class="pagination pagination-sm mb-0" id="ordersPager"
+      data-base="{{ url_for('lab.index', tab='orders', date_filter=date_filter) }}"
+      data-has-prev="{{ orders.has_prev|int }}" data-prev-num="{{ orders.prev_num or '' }}"
+      data-has-next="{{ orders.has_next|int }}" data-next-num="{{ orders.next_num or '' }}"
+      data-current="{{ orders.page }}" data-pages="{{ orders.iter_pages()|list|tojson }}"
+      data-q="{{ search or '' }}"></ul></nav>
   </div>
   {% endif %}
 </div>
@@ -198,7 +199,7 @@
 <div class="mc-card mb-3"><div class="mc-card-body py-2">
   <form method="GET" class="d-flex gap-2">
     <input type="hidden" name="tab" value="tests">
-    <input type="text" name="q" class="form-control form-control-sm" placeholder="Search test name or code…" value="{{ search or '' }}" style="max-width:280px">
+    <input type="text" name="q" class="form-control form-control-sm mc-search-input-md" placeholder="Search test name or code…" value="{{ search or '' }}">
     <button type="submit" class="btn btn-primary btn-sm">Search</button>
   </form>
 </div></div>
@@ -239,11 +240,12 @@
   {% if tests.pages > 1 %}
   <div class="mc-pager">
     <span>{{ tests.total }} tests</span>
-    <nav><ul class="pagination pagination-sm mb-0">
-      <li class="page-item {% if not tests.has_prev %}disabled{% endif %}"><a class="page-link" href="{{ url_for('lab.index', tab='tests', page=tests.prev_num, q=search) }}">‹</a></li>
-      {% for p in tests.iter_pages() %}{% if p %}<li class="page-item {% if p==tests.page %}active{% endif %}"><a class="page-link" href="{{ url_for('lab.index', tab='tests', page=p, q=search) }}">{{ p }}</a></li>{% endif %}{% endfor %}
-      <li class="page-item {% if not tests.has_next %}disabled{% endif %}"><a class="page-link" href="{{ url_for('lab.index', tab='tests', page=tests.next_num, q=search) }}">›</a></li>
-    </ul></nav>
+    <nav><ul class="pagination pagination-sm mb-0" id="testsPager"
+      data-base="{{ url_for('lab.index', tab='tests') }}"
+      data-has-prev="{{ tests.has_prev|int }}" data-prev-num="{{ tests.prev_num or '' }}"
+      data-has-next="{{ tests.has_next|int }}" data-next-num="{{ tests.next_num or '' }}"
+      data-current="{{ tests.page }}" data-pages="{{ tests.iter_pages()|list|tojson }}"
+      data-q="{{ search or '' }}"></ul></nav>
   </div>
   {% endif %}
 </div>
@@ -252,41 +254,41 @@
 {# ═══ NEW ORDER MODAL ═══ #}
 <div class="modal fade" id="newOrderModal" tabindex="-1">
 <div class="modal-dialog modal-lg"><div class="modal-content">
-<div class="modal-header"><h5 class="modal-title">New Lab Order</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+<div class="modal-header"><h5 class="modal-title">New Lab Order</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
 <form method="POST" action="{{ url_for('lab.order_save') }}">
 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 <div class="modal-body">
   <div class="row g-3 mb-3">
     <div class="col-md-6">
-      <label class="mc-label required">Patient</label>
+      <label class="mc-label required" for="patient-search">Patient</label>
       <div class="position-relative">
         <input type="text" id="patient-search" class="form-control" placeholder="Search patient…" autocomplete="off">
         <input type="hidden" name="patient_id" id="patient-id-field" required>
-        <div id="patient-results" class="position-absolute w-100 bg-white border rounded shadow-sm" style="display:none;z-index:2000;max-height:200px;overflow-y:auto"></div>
+        <div id="patient-results" class="position-absolute w-100 bg-white border rounded shadow-sm mc-patient-results"></div>
       </div>
     </div>
     <div class="col-md-4">
-      <label class="mc-label">Referring Doctor</label>
-      <select name="doctor_id" class="form-select">
+      <label class="mc-label" for="orderDoctor">Referring Doctor</label>
+      <select name="doctor_id" id="orderDoctor" class="form-select">
         <option value="">— Select —</option>
         {% for d in doctors or [] %}<option value="{{ d.id }}">{{ d.full_name }}</option>{% endfor %}
       </select>
     </div>
     <div class="col-md-2">
-      <label class="mc-label">Priority</label>
-      <select name="priority" class="form-select">
+      <label class="mc-label" for="orderPriority">Priority</label>
+      <select name="priority" id="orderPriority" class="form-select">
         <option value="routine">Routine</option>
         <option value="urgent">Urgent</option>
         <option value="stat">Stat</option>
       </select>
     </div>
     <div class="col-12">
-      <label class="mc-label">Clinical Info</label>
-      <input type="text" name="clinical_info" class="form-control" placeholder="Brief clinical notes for lab">
+      <label class="mc-label" for="orderClinicalInfo">Clinical Info</label>
+      <input type="text" name="clinical_info" id="orderClinicalInfo" class="form-control" placeholder="Brief clinical notes for lab">
     </div>
   </div>
   <h6 class="fw-semibold mb-2">Select Tests</h6>
-  <div class="row g-2" style="max-height:250px;overflow-y:auto">
+  <div class="row g-2 mc-scroll-tests">
     {% for t in tests or [] %}
     <div class="col-md-6">
       <div class="form-check border rounded p-2">
@@ -294,7 +296,7 @@
         <label class="form-check-label small" for="test_{{ t.id }}">
           <strong>{{ t.name }}</strong>
           {% if t.test_code %}<span class="text-muted ms-1">({{ t.test_code }})</span>{% endif %}
-          <br><span class="text-muted" style="font-size:.7rem">{{ t.sample_type or '' }} {% if t.price %}— ₹{{ "{:.0f}".format(t.price) }}{% endif %}</span>
+          <br><span class="text-muted mc-fine-print">{{ t.sample_type or '' }} {% if t.price %}— ₹{{ "{:.0f}".format(t.price) }}{% endif %}</span>
         </label>
       </div>
     </div>
@@ -312,7 +314,7 @@
         <input class="form-check-input" type="checkbox" name="panel_id[]" value="{{ p.id }}" id="panel_{{ p.id }}">
         <label class="form-check-label small" for="panel_{{ p.id }}">
           <strong>{{ p.name }}</strong>
-          {% if p.price %}<br><span class="text-muted" style="font-size:.7rem">₹{{ "{:.0f}".format(p.price) }}</span>{% endif %}
+          {% if p.price %}<br><span class="text-muted mc-fine-print">₹{{ "{:.0f}".format(p.price) }}</span>{% endif %}
         </label>
       </div>
     </div>
@@ -372,6 +374,34 @@
 
 {% block scripts %}
 <script>
+// Pagination — built client-side so each <ul> has no server-rendered <li>
+// text nodes in the source template (only data-* attributes on the <ul>).
+function buildPager(pagerId) {
+  const pager = document.getElementById(pagerId);
+  if (!pager) return;
+  const base    = pager.dataset.base;
+  const q       = pager.dataset.q;
+  const current = parseInt(pager.dataset.current, 10);
+  const pages   = JSON.parse(pager.dataset.pages);
+  const sep     = base.includes('?') ? '&' : '?';
+  const linkFor = page => `${base}${sep}page=${page}&q=${encodeURIComponent(q)}`;
+  const makeItem = (label, page, { disabled = false, active = false } = {}) => {
+    const li = document.createElement('li');
+    li.className = 'page-item' + (disabled ? ' disabled' : '') + (active ? ' active' : '');
+    const a = document.createElement('a');
+    a.className = 'page-link';
+    a.href = disabled ? '#' : linkFor(page);
+    a.textContent = label;
+    li.appendChild(a);
+    return li;
+  };
+  pager.appendChild(makeItem('‹', pager.dataset.prevNum, { disabled: pager.dataset.hasPrev !== '1' }));
+  pages.forEach(p => { if (p) pager.appendChild(makeItem(p, p, { active: p === current })); });
+  pager.appendChild(makeItem('›', pager.dataset.nextNum, { disabled: pager.dataset.hasNext !== '1' }));
+}
+buildPager('testsPager');
+buildPager('ordersPager');
+
 // Edit test - populate modal with the row's current values
 document.querySelectorAll('.edit-test-btn').forEach(btn => {
   btn.addEventListener('click', function () {

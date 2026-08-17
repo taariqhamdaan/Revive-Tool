@@ -688,3 +688,12 @@ textarea.form-control { resize: vertical; min-height: 72px; }
 .mc-denom-count { width: 80px; }
 .mc-bg-soft { background: #f8fafc; }
 .mc-dl-compact { font-size: .85rem; }
+.mc-dl-divider { border-top: 1px solid var(--mc-border-light, #dee2e6); margin: 4px 0; }
+
+/* ── Lab inline-style extractions ────────────────────────────────────────── */
+.mc-search-input-md { max-width: 280px; }
+.mc-scroll-tests { max-height: 250px; overflow-y: auto; }
+.mc-fine-print { font-size: .7rem; }
+.mc-summary-box { background: #f8fafc; font-size: .83rem; }
+.mc-w-65 { width: 65px; }
+.mc-w-90 { width: 90px; }

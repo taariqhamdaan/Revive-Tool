@@ -17,12 +17,12 @@
         <div class="position-relative">
           <input type="text" id="patient-search" class="form-control" placeholder="Search patient by name, UHID or phone…" autocomplete="off">
           <input type="hidden" name="patient_id" id="patient-id-field" required>
-          <div id="patient-results" class="position-absolute w-100 bg-white border rounded shadow-sm" style="display:none;z-index:1000;max-height:220px;overflow-y:auto"></div>
+          <div id="patient-results" class="position-absolute w-100 bg-white border rounded shadow-sm mc-patient-results"></div>
         </div>
         <div class="row g-2 mt-2">
           <div class="col-md-4">
-            <label class="mc-label">Bill Type</label>
-            <select name="bill_type" class="form-select form-select-sm">
+            <label class="mc-label" for="billType">Bill Type</label>
+            <select name="bill_type" id="billType" class="form-select form-select-sm">
               <option value="opd">OPD</option><option value="ipd">IPD</option>
               <option value="pharmacy">Pharmacy</option><option value="lab">Lab</option>
               <option value="radiology">Radiology</option>
@@ -41,7 +41,7 @@
       </div>
       <div class="mc-card-body p-0">
         <table class="mc-table" id="itemsTable">
-          <thead><tr><th>Description</th><th>Qty</th><th>Rate (₹)</th><th>GST %</th><th>GST Amt</th><th>Amount</th><th></th></tr></thead>
+          <thead><tr><th>Description</th><th>Qty</th><th>Rate (₹)</th><th>GST %</th><th>GST Amt</th><th>Amount</th><th><span class="visually-hidden">Actions</span></th></tr></thead>
           <tbody id="itemsBody"></tbody>
           <tfoot>
             <tr class="table-light">
@@ -59,29 +59,30 @@
       <div class="mc-card-header"><i class="bi bi-calculator"></i> Payment</div>
       <div class="mc-card-body">
         <div class="mb-3">
-          <label class="mc-label">Discount %</label>
+          <label class="mc-label" for="discountPct">Discount %</label>
           <div class="input-group input-group-sm">
             <input type="number" name="discount_pct" class="form-control" id="discountPct" value="0" min="0" max="100">
             <span class="input-group-text">%</span>
           </div>
         </div>
         <div class="mb-3">
-          <label class="mc-label">Payment Mode</label>
-          <select name="payment_mode" class="form-select form-select-sm">
+          <label class="mc-label" for="paymentMode">Payment Mode</label>
+          <select name="payment_mode" id="paymentMode" class="form-select form-select-sm">
             <option value="cash">Cash</option><option value="upi">UPI/GPay</option>
-            <option value="card">Card</option><option value="cheque">Cheque</option>
-            <option value="neft">NEFT</option><option value="insurance">Insurance</option>
+            <option value="card">Card</option><option value="bank_transfer">Bank Transfer</option>
+            <option value="cheque">Cheque</option><option value="neft">NEFT</option>
+            <option value="insurance">Insurance</option>
           </select>
         </div>
         <div class="mb-3">
-          <label class="mc-label">Reference No.</label>
-          <input type="text" name="reference_no" class="form-control form-control-sm" placeholder="UPI Ref / Cheque No.">
+          <label class="mc-label" for="referenceNo">Reference No.</label>
+          <input type="text" name="reference_no" id="referenceNo" class="form-control form-control-sm" placeholder="UPI Ref / Cheque No.">
         </div>
         <div class="mb-3">
-          <label class="mc-label">Amount Paid (₹)</label>
+          <label class="mc-label" for="paidAmt">Amount Paid (₹)</label>
           <input type="number" name="paid_amount" class="form-control" id="paidAmt" step="0.01" value="0">
         </div>
-        <div class="border rounded p-3 mb-3" style="background:#f8fafc;font-size:.83rem">
+        <div class="border rounded p-3 mb-3 mc-summary-box">
           <div class="d-flex justify-content-between mb-1"><span>Subtotal</span><strong id="summSubtotal">₹0.00</strong></div>
           <div class="d-flex justify-content-between mb-1"><span>Discount</span><strong class="text-warning" id="summDiscount">₹0.00</strong></div>
           <div class="d-flex justify-content-between mb-1"><span>GST</span><strong id="summGst">₹0.00</strong></div>
@@ -101,12 +102,12 @@
 <script>
 const itemRow = `<tr>
   <td><input type="text" name="item_desc[]" class="form-control form-control-sm" placeholder="Service / Item description" required></td>
-  <td><input type="number" name="item_qty[]" class="form-control form-control-sm item-qty" value="1" min="0.001" step="0.001" style="width:65px"></td>
-  <td><input type="number" name="item_rate[]" class="form-control form-control-sm item-rate" value="0" step="0.01" style="width:90px"></td>
-  <td><input type="number" name="item_gst[]" class="form-control form-control-sm item-gst" value="0" step="0.01" style="width:65px"></td>
+  <td><input type="number" name="item_qty[]" class="form-control form-control-sm item-qty mc-w-65" value="1" min="0.001" step="0.001" aria-label="Quantity"></td>
+  <td><input type="number" name="item_rate[]" class="form-control form-control-sm item-rate mc-w-90" value="0" step="0.01" aria-label="Rate"></td>
+  <td><input type="number" name="item_gst[]" class="form-control form-control-sm item-gst mc-w-65" value="0" step="0.01" aria-label="GST percent"></td>
   <td class="item-gst-amt text-muted small">₹0.00</td>
   <td class="item-amt fw-semibold">₹0.00</td>
-  <td><button type="button" class="btn btn-icon btn-outline-danger btn-sm remove-item"><i class="bi bi-trash"></i></button></td>
+  <td><button type="button" class="btn btn-icon btn-outline-danger btn-sm remove-item" aria-label="Remove item"><i class="bi bi-trash"></i></button></td>
 </tr>`;
 
 function calcRow(tr) {

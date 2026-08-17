@@ -11,5 +11,5 @@ from app.models.ipd import Ward, Bed, Admission, DailyNote, DischargeSummary
 from app.models.pharmacy import DrugCategory, DrugMaster, Supplier, PurchaseOrder, POItem, GRN, GRNItem, StockLedger, Dispensing, DispensingItem
 from app.models.lab import TestCategory, TestMaster, TestPanel, TestPanelItem, LabOrder, LabOrderItem, LabResult
 from app.models.radiology import InvestigationMaster, RadiologyOrder, RadiologyReport
-from app.models.billing import TPAMaster, BillMaster, BillItem, Payment, Receipt, CreditNote, InsuranceClaim
+from app.models.billing import TPAMaster, BillMaster, BillItem, Payment, Receipt, CreditNote, InsuranceClaim, Expense
 from app.models.payroll import SalaryComponent, SalaryStructure, SalaryStructureItem, PayrollRun, PaySlip, PaySlipItem

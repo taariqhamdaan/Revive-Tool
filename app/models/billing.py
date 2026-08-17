@@ -104,7 +104,7 @@ class Payment(db.Model):
     bill_id        = db.Column(db.Integer, db.ForeignKey("bill_master.id"), nullable=False)
     patient_id     = db.Column(db.Integer, db.ForeignKey("patients.id"), nullable=False)
     payment_mode   = db.Column(db.String(30), nullable=False)
-    # modes: cash, upi, card, cheque, neft, insurance, advance_adjustment
+    # modes: cash, upi, card, bank_transfer, cheque, neft, insurance, advance_adjustment
     amount         = db.Column(db.Numeric(12, 2), nullable=False)
     reference_no   = db.Column(db.String(100))   # UPI ref, cheque no, etc.
     paid_at        = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
@@ -113,6 +113,9 @@ class Payment(db.Model):
     is_refunded    = db.Column(db.Boolean, default=False)
     refund_at      = db.Column(db.DateTime, nullable=True)
     is_deleted     = db.Column(db.Boolean, default=False)
+
+    patient        = db.relationship("Patient")
+    receiver       = db.relationship("User", foreign_keys=[received_by])
 
 
 class Receipt(db.Model):
@@ -167,3 +170,25 @@ class InsuranceClaim(db.Model):
     notes           = db.Column(db.Text)
     is_deleted      = db.Column(db.Boolean, default=False)
     created_at      = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+
+
+class Expense(db.Model):
+    """
+    Hospital's own operating expense — rent, utilities, supplies, etc.
+    Not tied to a patient; a separate ledger from patient billing.
+    """
+    __tablename__ = "expenses"
+
+    id           = db.Column(db.Integer, primary_key=True)
+    branch_id    = db.Column(db.Integer, db.ForeignKey("branches.id"), nullable=False)
+    expense_date = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    category     = db.Column(db.String(60))    # rent, utilities, supplies, maintenance, salary, other
+    payee        = db.Column(db.String(150))   # vendor / paid to
+    description  = db.Column(db.String(255))
+    amount       = db.Column(db.Numeric(12, 2), default=0)
+    payment_mode = db.Column(db.String(20))    # cash, upi, card, bank_transfer, cheque
+    reference_no = db.Column(db.String(60))
+    notes        = db.Column(db.Text)
+    is_deleted   = db.Column(db.Boolean, default=False)
+    created_by   = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    created_at   = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
