@@ -676,3 +676,7 @@ textarea.form-control { resize: vertical; min-height: 72px; }
 .mc-branch-tag { font-size: .72rem; color: rgba(255, 255, 255, .6); }
 .mc-dropdown-subtext { font-size: .75rem; }
 .mc-alert-narrow { max-width: 400px; }
+
+/* ── Pharmacy inline-style extractions ───────────────────────────────────── */
+.mc-search-input { max-width: 300px; }
+.mc-patient-results { display: none; z-index: 2000; max-height: 200px; overflow-y: auto; }

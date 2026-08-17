@@ -36,7 +36,7 @@
 <div class="mc-card mb-3"><div class="mc-card-body py-2">
   <form method="GET" class="d-flex gap-2">
     <input type="hidden" name="tab" value="drugs">
-    <input type="text" name="q" class="form-control form-control-sm" placeholder="Search drug name, brand or code…" value="{{ search or '' }}" style="max-width:300px">
+    <input type="text" name="q" class="form-control form-control-sm mc-search-input" placeholder="Search drug name, brand or code…" value="{{ search or '' }}">
     <button type="submit" class="btn btn-primary btn-sm">Search</button>
   </form>
 </div></div>
@@ -66,11 +66,12 @@
                 data-mrp="{{ d.mrp or 0 }}" data-rate="{{ d.sale_rate or 0 }}"
                 data-purchase="{{ d.purchase_rate or 0 }}" data-gst="{{ d.gst_percent or 12 }}"
                 data-reorder="{{ d.reorder_level or 10 }}" data-schedule="{{ d.schedule or '' }}"
-                title="Edit"><i class="bi bi-pencil"></i></button>
+                title="Edit" aria-label="Edit {{ d.generic_name }}"><i class="bi bi-pencil"></i></button>
               <form method="POST" action="{{ url_for('pharmacy.drug_toggle', drug_id=d.id) }}" class="d-inline">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <button type="submit" class="btn btn-icon btn-sm {% if d.is_active %}btn-outline-warning{% else %}btn-outline-success{% endif %}"
                         title="{{ 'Deactivate' if d.is_active else 'Activate' }}"
+                        aria-label="{{ 'Deactivate' if d.is_active else 'Activate' }} {{ d.generic_name }}"
                         data-confirm="{{ 'Deactivate' if d.is_active else 'Activate' }} this drug?">
                   <i class="bi bi-{% if d.is_active %}pause{% else %}play{% endif %}"></i>
                 </button>
@@ -310,41 +311,41 @@
 {# Add Drug Modal #}
 <div class="modal fade" id="addDrugModal" tabindex="-1">
 <div class="modal-dialog modal-lg"><div class="modal-content">
-<div class="modal-header"><h5 class="modal-title" id="drugModalTitle">Add Drug</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+<div class="modal-header"><h5 class="modal-title" id="drugModalTitle">Add Drug</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
 <form method="POST" action="{{ url_for('pharmacy.drug_save') }}">
 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 <input type="hidden" name="drug_id" id="drugEditId">
 <div class="modal-body">
   <div class="row g-3">
-    <div class="col-md-6"><label class="mc-label required">Generic Name</label><input type="text" name="generic_name" id="drugGeneric" class="form-control" required></div>
-    <div class="col-md-6"><label class="mc-label">Brand Name</label><input type="text" name="brand_name" id="drugBrand" class="form-control"></div>
-    <div class="col-md-4"><label class="mc-label">Category</label>
-      <select name="category_id" class="form-select">
+    <div class="col-md-6"><label class="mc-label required" for="drugGeneric">Generic Name</label><input type="text" name="generic_name" id="drugGeneric" class="form-control" required></div>
+    <div class="col-md-6"><label class="mc-label" for="drugBrand">Brand Name</label><input type="text" name="brand_name" id="drugBrand" class="form-control"></div>
+    <div class="col-md-4"><label class="mc-label" for="drugCategory">Category</label>
+      <select name="category_id" id="drugCategory" class="form-select">
         <option value="">— Select —</option>
         {% for c in categories or [] %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}
       </select>
     </div>
-    <div class="col-md-4"><label class="mc-label">Strength</label><input type="text" name="strength" id="drugStrength" class="form-control" placeholder="500mg, 5mg/5ml"></div>
-    <div class="col-md-4"><label class="mc-label">Form</label>
-      <select name="form" class="form-select">
+    <div class="col-md-4"><label class="mc-label" for="drugStrength">Strength</label><input type="text" name="strength" id="drugStrength" class="form-control" placeholder="500mg, 5mg/5ml"></div>
+    <div class="col-md-4"><label class="mc-label" for="drugForm">Form</label>
+      <select name="form" id="drugForm" class="form-select">
         <option value="">— Select —</option>
         {% for f in ['Tablet','Capsule','Syrup','Injection','Drops','Cream','Ointment','Inhaler','Patch','Powder','Gel'] %}
         <option>{{ f }}</option>{% endfor %}
       </select>
     </div>
-    <div class="col-md-3"><label class="mc-label">Schedule</label>
-      <select name="schedule" class="form-select">
+    <div class="col-md-3"><label class="mc-label" for="drugSchedule">Schedule</label>
+      <select name="schedule" id="drugSchedule" class="form-select">
         <option value="">—</option>
         {% for s in ['OTC','H','H1','X','G','J'] %}<option>{{ s }}</option>{% endfor %}
       </select>
     </div>
-    <div class="col-md-3"><label class="mc-label">Unit</label><input type="text" name="unit_of_measure" class="form-control" placeholder="Tablet, ml, Strip"></div>
-    <div class="col-md-2"><label class="mc-label">GST %</label><input type="number" name="gst_percent" id="drugGst" class="form-control" value="12" step="0.01"></div>
-    <div class="col-md-2"><label class="mc-label">Reorder</label><input type="number" name="reorder_level" id="drugReorder" class="form-control" value="10"></div>
-    <div class="col-md-2"><label class="mc-label">HSN Code</label><input type="text" name="hsn_code" class="form-control"></div>
-    <div class="col-md-4"><label class="mc-label">Purchase Rate (₹)</label><input type="number" name="purchase_rate" id="drugPurchase" class="form-control" step="0.01" value="0"></div>
-    <div class="col-md-4"><label class="mc-label">Sale Rate (₹)</label><input type="number" name="sale_rate" id="drugRate" class="form-control" step="0.01" value="0"></div>
-    <div class="col-md-4"><label class="mc-label">MRP (₹)</label><input type="number" name="mrp" id="drugMrp" class="form-control" step="0.01" value="0"></div>
+    <div class="col-md-3"><label class="mc-label" for="drugUnit">Unit</label><input type="text" name="unit_of_measure" id="drugUnit" class="form-control" placeholder="Tablet, ml, Strip"></div>
+    <div class="col-md-2"><label class="mc-label" for="drugGst">GST %</label><input type="number" name="gst_percent" id="drugGst" class="form-control" value="12" step="0.01"></div>
+    <div class="col-md-2"><label class="mc-label" for="drugReorder">Reorder</label><input type="number" name="reorder_level" id="drugReorder" class="form-control" value="10"></div>
+    <div class="col-md-2"><label class="mc-label" for="drugHsn">HSN Code</label><input type="text" name="hsn_code" id="drugHsn" class="form-control"></div>
+    <div class="col-md-4"><label class="mc-label" for="drugPurchase">Purchase Rate (₹)</label><input type="number" name="purchase_rate" id="drugPurchase" class="form-control" step="0.01" value="0"></div>
+    <div class="col-md-4"><label class="mc-label" for="drugRate">Sale Rate (₹)</label><input type="number" name="sale_rate" id="drugRate" class="form-control" step="0.01" value="0"></div>
+    <div class="col-md-4"><label class="mc-label" for="drugMrp">MRP (₹)</label><input type="number" name="mrp" id="drugMrp" class="form-control" step="0.01" value="0"></div>
   </div>
 </div>
 <div class="modal-footer">
@@ -357,18 +358,18 @@
 {# Add Supplier Modal #}
 <div class="modal fade" id="addSupModal" tabindex="-1">
 <div class="modal-dialog"><div class="modal-content">
-<div class="modal-header"><h5 class="modal-title">Add Supplier</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+<div class="modal-header"><h5 class="modal-title">Add Supplier</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
 <form method="POST" action="{{ url_for('pharmacy.supplier_save') }}">
 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 <div class="modal-body">
   <div class="row g-3">
-    <div class="col-12"><label class="mc-label required">Supplier Name</label><input type="text" name="name" class="form-control" required></div>
-    <div class="col-md-6"><label class="mc-label">Contact Person</label><input type="text" name="contact_name" class="form-control"></div>
-    <div class="col-md-6"><label class="mc-label">Phone</label><input type="tel" name="phone" class="form-control"></div>
-    <div class="col-md-6"><label class="mc-label">Email</label><input type="email" name="email" class="form-control"></div>
-    <div class="col-md-6"><label class="mc-label">GSTIN</label><input type="text" name="gstin" class="form-control"></div>
-    <div class="col-md-6"><label class="mc-label">Drug License No.</label><input type="text" name="drug_license" class="form-control"></div>
-    <div class="col-12"><label class="mc-label">Address</label><textarea name="address" class="form-control" rows="2"></textarea></div>
+    <div class="col-12"><label class="mc-label required" for="supName">Supplier Name</label><input type="text" name="name" id="supName" class="form-control" required></div>
+    <div class="col-md-6"><label class="mc-label" for="supContact">Contact Person</label><input type="text" name="contact_name" id="supContact" class="form-control"></div>
+    <div class="col-md-6"><label class="mc-label" for="supPhone">Phone</label><input type="tel" name="phone" id="supPhone" class="form-control"></div>
+    <div class="col-md-6"><label class="mc-label" for="supEmail">Email</label><input type="email" name="email" id="supEmail" class="form-control"></div>
+    <div class="col-md-6"><label class="mc-label" for="supGstin">GSTIN</label><input type="text" name="gstin" id="supGstin" class="form-control"></div>
+    <div class="col-md-6"><label class="mc-label" for="supLicense">Drug License No.</label><input type="text" name="drug_license" id="supLicense" class="form-control"></div>
+    <div class="col-12"><label class="mc-label" for="supAddress">Address</label><textarea name="address" id="supAddress" class="form-control" rows="2"></textarea></div>
   </div>
 </div>
 <div class="modal-footer">
@@ -381,20 +382,20 @@
 {# New PO Modal #}
 <div class="modal fade" id="addPOModal" tabindex="-1">
 <div class="modal-dialog modal-xl"><div class="modal-content">
-<div class="modal-header"><h5 class="modal-title">New Purchase Order</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+<div class="modal-header"><h5 class="modal-title">New Purchase Order</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
 <form method="POST" action="{{ url_for('pharmacy.po_save') }}">
 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 <div class="modal-body">
   <div class="row g-3 mb-3">
-    <div class="col-md-4"><label class="mc-label required">Supplier</label>
-      <select name="supplier_id" class="form-select" required>
+    <div class="col-md-4"><label class="mc-label required" for="poSupplier">Supplier</label>
+      <select name="supplier_id" id="poSupplier" class="form-select" required>
         <option value="">— Select —</option>
         {% for s in suppliers or [] %}<option value="{{ s.id }}">{{ s.name }}</option>{% endfor %}
       </select>
     </div>
-    <div class="col-md-3"><label class="mc-label required">PO Date</label><input type="date" name="po_date" class="form-control" value="{{ today.isoformat() }}" required></div>
-    <div class="col-md-3"><label class="mc-label">Expected Delivery</label><input type="date" name="expected_date" class="form-control"></div>
-    <div class="col-12"><label class="mc-label">Notes</label><input type="text" name="notes" class="form-control" placeholder="Optional notes to supplier"></div>
+    <div class="col-md-3"><label class="mc-label required" for="poDate">PO Date</label><input type="date" name="po_date" id="poDate" class="form-control" value="{{ today.isoformat() }}" required></div>
+    <div class="col-md-3"><label class="mc-label" for="poExpected">Expected Delivery</label><input type="date" name="expected_date" id="poExpected" class="form-control"></div>
+    <div class="col-12"><label class="mc-label" for="poNotes">Notes</label><input type="text" name="notes" id="poNotes" class="form-control" placeholder="Optional notes to supplier"></div>
   </div>
   <table class="mc-table" id="poItemsTable">
     <thead><tr><th>Drug</th><th>Qty</th><th>Unit Rate (₹)</th><th>GST %</th><th>Total</th><th></th></tr></thead>
@@ -412,25 +413,25 @@
 {# New GRN Modal #}
 <div class="modal fade" id="addGRNModal" tabindex="-1">
 <div class="modal-dialog modal-xl"><div class="modal-content">
-<div class="modal-header"><h5 class="modal-title">New GRN — Goods Received</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+<div class="modal-header"><h5 class="modal-title">New GRN — Goods Received</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
 <form method="POST" action="{{ url_for('pharmacy.grn_save') }}">
 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 <div class="modal-body">
   <div class="row g-3 mb-3">
-    <div class="col-md-3"><label class="mc-label required">Supplier</label>
-      <select name="supplier_id" class="form-select" required>
+    <div class="col-md-3"><label class="mc-label required" for="grnSupplier">Supplier</label>
+      <select name="supplier_id" id="grnSupplier" class="form-select" required>
         <option value="">— Select —</option>
         {% for s in suppliers or [] %}<option value="{{ s.id }}">{{ s.name }}</option>{% endfor %}
       </select>
     </div>
-    <div class="col-md-3"><label class="mc-label">Against PO</label>
-      <select name="po_id" class="form-select">
+    <div class="col-md-3"><label class="mc-label" for="grnPoId">Against PO</label>
+      <select name="po_id" id="grnPoId" class="form-select">
         <option value="">— Direct Purchase —</option>
         {% for p in pos or [] %}<option value="{{ p.id }}">{{ p.po_number }} ({{ p.supplier.name if p.supplier else '' }})</option>{% endfor %}
       </select>
     </div>
-    <div class="col-md-2"><label class="mc-label required">GRN Date</label><input type="date" name="grn_date" class="form-control" value="{{ today.isoformat() }}" required></div>
-    <div class="col-md-2"><label class="mc-label">Invoice No.</label><input type="text" name="invoice_number" class="form-control"></div>
+    <div class="col-md-2"><label class="mc-label required" for="grnDate">GRN Date</label><input type="date" name="grn_date" id="grnDate" class="form-control" value="{{ today.isoformat() }}" required></div>
+    <div class="col-md-2"><label class="mc-label" for="grnInvoice">Invoice No.</label><input type="text" name="invoice_number" id="grnInvoice" class="form-control"></div>
   </div>
   <table class="mc-table" id="grnItemsTable">
     <thead><tr><th>Drug</th><th>Batch No.</th><th>Expiry Date</th><th>Qty</th><th>Purchase Rate</th><th>MRP</th><th>Total</th><th></th></tr></thead>
@@ -448,20 +449,20 @@
 {# Dispense Modal #}
 <div class="modal fade" id="dispenseModal" tabindex="-1">
 <div class="modal-dialog modal-xl"><div class="modal-content">
-<div class="modal-header"><h5 class="modal-title">Dispense Medicines</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+<div class="modal-header"><h5 class="modal-title">Dispense Medicines</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
 <form method="POST" action="{{ url_for('pharmacy.dispense_save') }}">
 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 <div class="modal-body">
   <div class="row g-3 mb-3">
     <div class="col-md-5">
-      <label class="mc-label required">Patient</label>
+      <label class="mc-label required" for="patient-search">Patient</label>
       <div class="position-relative">
         <input type="text" id="patient-search" class="form-control" placeholder="Search patient…" autocomplete="off">
         <input type="hidden" name="patient_id" id="patient-id-field" required>
-        <div id="patient-results" class="position-absolute w-100 bg-white border rounded shadow-sm" style="display:none;z-index:2000;max-height:200px;overflow-y:auto"></div>
+        <div id="patient-results" class="position-absolute w-100 bg-white border rounded shadow-sm mc-patient-results"></div>
       </div>
     </div>
-    <div class="col-md-4"><label class="mc-label">Discount (₹)</label><input type="number" name="discount_amount" class="form-control" value="0" step="0.01"></div>
+    <div class="col-md-4"><label class="mc-label" for="dispDiscount">Discount (₹)</label><input type="number" name="discount_amount" id="dispDiscount" class="form-control" value="0" step="0.01"></div>
   </div>
   <table class="mc-table" id="dispItems">
     <thead><tr><th>Drug</th><th>Stock</th><th>Qty</th><th>Rate (₹)</th><th>Amount</th><th></th></tr></thead>
