@@ -205,7 +205,7 @@
 <div class="mc-card">
   <div class="mc-card-body p-0 mc-table-wrap">
     <table class="mc-table">
-      <thead><tr><th>Code</th><th>Test Name</th><th>Category</th><th>Sample</th><th>Unit</th><th>Normal Range</th><th>Price</th><th>TAT</th><th>Status</th></tr></thead>
+      <thead><tr><th>Code</th><th>Test Name</th><th>Category</th><th>Sample</th><th>Unit</th><th>Normal Range</th><th>Price</th><th>TAT</th><th>Status</th><th>Action</th></tr></thead>
       <tbody>
         {% for t in tests.items %}
         <tr>
@@ -218,9 +218,20 @@
           <td class="small">₹{{ "{:.2f}".format(t.price or 0) }}</td>
           <td class="small text-muted">{{ t.turnaround_hrs or '24' }}h</td>
           <td><span class="mc-badge {% if t.is_active %}mc-badge-active{% else %}mc-badge-inactive{% endif %}">{{ 'Active' if t.is_active else 'Inactive' }}</span></td>
+          <td>
+            <button type="button" class="btn btn-icon btn-outline-secondary btn-sm edit-test-btn"
+              data-id="{{ t.id }}" data-code="{{ t.test_code or '' }}" data-name="{{ t.name }}"
+              data-category="{{ t.category_id or '' }}" data-sample="{{ t.sample_type or '' }}"
+              data-method="{{ t.method or '' }}" data-unit="{{ t.unit or '' }}"
+              data-normal="{{ t.normal_range or '' }}" data-male="{{ t.male_range or '' }}"
+              data-female="{{ t.female_range or '' }}" data-critlow="{{ t.critical_low or '' }}"
+              data-crithigh="{{ t.critical_high or '' }}" data-tat="{{ t.turnaround_hrs or 24 }}"
+              data-price="{{ t.price or 0 }}"
+              title="Edit" aria-label="Edit {{ t.name }}"><i class="bi bi-pencil"></i></button>
+          </td>
         </tr>
         {% else %}
-        <tr><td colspan="9" class="text-center text-muted py-4">No tests configured. Add tests or use bulk upload.</td></tr>
+        <tr><td colspan="10" class="text-center text-muted py-4">No tests configured. Add tests or use bulk upload.</td></tr>
         {% endfor %}
       </tbody>
     </table>
@@ -319,34 +330,35 @@
 {# ═══ ADD TEST MODAL ═══ #}
 <div class="modal fade" id="addTestModal" tabindex="-1">
 <div class="modal-dialog modal-lg"><div class="modal-content">
-<div class="modal-header"><h5 class="modal-title">Add Lab Test</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+<div class="modal-header"><h5 class="modal-title" id="testModalTitle">Add Lab Test</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
 <form method="POST" action="{{ url_for('lab.test_save') }}">
 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+<input type="hidden" name="test_id" id="testEditId">
 <div class="modal-body">
   <div class="row g-3">
-    <div class="col-md-3"><label class="mc-label">Test Code</label><input type="text" name="test_code" class="form-control" placeholder="CBC, LFT…"></div>
-    <div class="col-md-5"><label class="mc-label required">Test Name</label><input type="text" name="name" class="form-control" required></div>
-    <div class="col-md-4"><label class="mc-label">Category</label>
-      <select name="category_id" class="form-select">
+    <div class="col-md-3"><label class="mc-label" for="testCode">Test Code</label><input type="text" name="test_code" id="testCode" class="form-control" placeholder="CBC, LFT…"></div>
+    <div class="col-md-5"><label class="mc-label required" for="testName">Test Name</label><input type="text" name="name" id="testName" class="form-control" required></div>
+    <div class="col-md-4"><label class="mc-label" for="testCategory">Category</label>
+      <select name="category_id" id="testCategory" class="form-select">
         <option value="">— Select —</option>
         {% for c in categories or [] %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}
       </select>
     </div>
-    <div class="col-md-4"><label class="mc-label">Sample Type</label>
-      <select name="sample_type" class="form-select">
+    <div class="col-md-4"><label class="mc-label" for="testSample">Sample Type</label>
+      <select name="sample_type" id="testSample" class="form-select">
         <option value="">—</option>
         {% for s in ['Blood','Urine','Stool','Swab','Sputum','CSF','Other'] %}<option>{{ s }}</option>{% endfor %}
       </select>
     </div>
-    <div class="col-md-4"><label class="mc-label">Unit</label><input type="text" name="unit" class="form-control" placeholder="mg/dL, IU/L…"></div>
-    <div class="col-md-4"><label class="mc-label">Method</label><input type="text" name="method" class="form-control" placeholder="Colorimetric, ELISA…"></div>
-    <div class="col-md-4"><label class="mc-label">Normal Range</label><input type="text" name="normal_range" class="form-control" placeholder="70-110"></div>
-    <div class="col-md-4"><label class="mc-label">Male Range</label><input type="text" name="male_range" class="form-control" placeholder="Optional"></div>
-    <div class="col-md-4"><label class="mc-label">Female Range</label><input type="text" name="female_range" class="form-control" placeholder="Optional"></div>
-    <div class="col-md-3"><label class="mc-label">Critical Low</label><input type="number" name="critical_low" class="form-control" step="0.001"></div>
-    <div class="col-md-3"><label class="mc-label">Critical High</label><input type="number" name="critical_high" class="form-control" step="0.001"></div>
-    <div class="col-md-3"><label class="mc-label">TAT (hrs)</label><input type="number" name="turnaround_hrs" class="form-control" value="24"></div>
-    <div class="col-md-3"><label class="mc-label">Price (₹)</label><input type="number" name="price" class="form-control" step="0.01" value="0"></div>
+    <div class="col-md-4"><label class="mc-label" for="testUnit">Unit</label><input type="text" name="unit" id="testUnit" class="form-control" placeholder="mg/dL, IU/L…"></div>
+    <div class="col-md-4"><label class="mc-label" for="testMethod">Method</label><input type="text" name="method" id="testMethod" class="form-control" placeholder="Colorimetric, ELISA…"></div>
+    <div class="col-md-4"><label class="mc-label" for="testNormal">Normal Range</label><input type="text" name="normal_range" id="testNormal" class="form-control" placeholder="70-110"></div>
+    <div class="col-md-4"><label class="mc-label" for="testMale">Male Range</label><input type="text" name="male_range" id="testMale" class="form-control" placeholder="Optional"></div>
+    <div class="col-md-4"><label class="mc-label" for="testFemale">Female Range</label><input type="text" name="female_range" id="testFemale" class="form-control" placeholder="Optional"></div>
+    <div class="col-md-3"><label class="mc-label" for="testCritLow">Critical Low</label><input type="number" name="critical_low" id="testCritLow" class="form-control" step="0.001"></div>
+    <div class="col-md-3"><label class="mc-label" for="testCritHigh">Critical High</label><input type="number" name="critical_high" id="testCritHigh" class="form-control" step="0.001"></div>
+    <div class="col-md-3"><label class="mc-label" for="testTat">TAT (hrs)</label><input type="number" name="turnaround_hrs" id="testTat" class="form-control" value="24"></div>
+    <div class="col-md-3"><label class="mc-label" for="testPrice">Price (₹)</label><input type="number" name="price" id="testPrice" class="form-control" step="0.01" value="0"></div>
   </div>
 </div>
 <div class="modal-footer">
@@ -356,4 +368,40 @@
 </form>
 </div></div></div>
 
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Edit test - populate modal with the row's current values
+document.querySelectorAll('.edit-test-btn').forEach(btn => {
+  btn.addEventListener('click', function () {
+    document.getElementById('testModalTitle').textContent = 'Edit Lab Test';
+    document.getElementById('testEditId').value    = this.dataset.id;
+    document.getElementById('testCode').value      = this.dataset.code;
+    document.getElementById('testName').value      = this.dataset.name;
+    document.getElementById('testCategory').value  = this.dataset.category;
+    document.getElementById('testSample').value    = this.dataset.sample;
+    document.getElementById('testMethod').value    = this.dataset.method;
+    document.getElementById('testUnit').value      = this.dataset.unit;
+    document.getElementById('testNormal').value    = this.dataset.normal;
+    document.getElementById('testMale').value      = this.dataset.male;
+    document.getElementById('testFemale').value    = this.dataset.female;
+    document.getElementById('testCritLow').value   = this.dataset.critlow;
+    document.getElementById('testCritHigh').value  = this.dataset.crithigh;
+    document.getElementById('testTat').value       = this.dataset.tat;
+    document.getElementById('testPrice').value     = this.dataset.price;
+    new bootstrap.Modal(document.getElementById('addTestModal')).show();
+  });
+});
+
+// Reset back to "Add" mode when the modal closes
+const testModalEl = document.getElementById('addTestModal');
+if (testModalEl) {
+  testModalEl.addEventListener('hidden.bs.modal', function () {
+    document.getElementById('testModalTitle').textContent = 'Add Lab Test';
+    document.getElementById('testEditId').value = '';
+    this.querySelector('form').reset();
+  });
+}
+</script>
 {% endblock %}
