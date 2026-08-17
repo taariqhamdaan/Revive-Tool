@@ -88,11 +88,7 @@
   {% if drugs.pages > 1 %}
   <div class="mc-pager">
     <span>{{ drugs.total }} drugs</span>
-    <nav><ul class="pagination pagination-sm mb-0">
-      <li class="page-item {% if not drugs.has_prev %}disabled{% endif %}"><a class="page-link" href="{{ url_for('pharmacy.index', tab='drugs', page=drugs.prev_num, q=search) }}">‹</a></li>
-      {% for p in drugs.iter_pages() %}{% if p %}<li class="page-item {% if p==drugs.page %}active{% endif %}"><a class="page-link" href="{{ url_for('pharmacy.index', tab='drugs', page=p, q=search) }}">{{ p }}</a></li>{% endif %}{% endfor %}
-      <li class="page-item {% if not drugs.has_next %}disabled{% endif %}"><a class="page-link" href="{{ url_for('pharmacy.index', tab='drugs', page=drugs.next_num, q=search) }}">›</a></li>
-    </ul></nav>
+    <nav><ul class="pagination pagination-sm mb-0"><li class="page-item {% if not drugs.has_prev %}disabled{% endif %}"><a class="page-link" href="{{ url_for('pharmacy.index', tab='drugs', page=drugs.prev_num, q=search) }}">‹</a></li>{% for p in drugs.iter_pages() %}{% if p %}<li class="page-item {% if p==drugs.page %}active{% endif %}"><a class="page-link" href="{{ url_for('pharmacy.index', tab='drugs', page=p, q=search) }}">{{ p }}</a></li>{% endif %}{% endfor %}<li class="page-item {% if not drugs.has_next %}disabled{% endif %}"><a class="page-link" href="{{ url_for('pharmacy.index', tab='drugs', page=drugs.next_num, q=search) }}">›</a></li></ul></nav>
   </div>
   {% endif %}
 </div>
@@ -481,9 +477,6 @@
 
 {% block scripts %}
 <script>
-// Drug drug options for PO/GRN/Dispense
-const allDrugs = {{ (drugs.items | map(attribute='id') | list) | tojson if drugs else '[]' }};
-
 // Edit drug - populate modal
 document.querySelectorAll('.edit-drug-btn').forEach(btn => {
   btn.addEventListener('click', function() {
@@ -507,7 +500,6 @@ document.getElementById('addDrugModal').addEventListener('hidden.bs.modal', func
 });
 
 // PO item row
-const drugSelect = `<select name="po_drug_id[]" class="form-select form-select-sm" required><option value="">— Select Drug —</option>{{ (drugs.items | map(attribute='id') | list) | tojson }}</select>`;
 function mkDrugSelect(nameAttr) {
   return `<select name="${nameAttr}" class="form-select form-select-sm" required>
     <option value="">— Select Drug —</option>
