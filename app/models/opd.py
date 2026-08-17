@@ -1,4 +1,4 @@
-# MediCore/Rivive SCH - app/models/opd.py
+# Revive/Rivive SCH - app/models/opd.py
 # OPD: Doctor, Schedule, Appointment, Consultation, Patient History (12 sections),
 # Prescription, Referral. All history sections are queryable individually.
 

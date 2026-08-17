@@ -12,7 +12,7 @@
   <div class="mc-card-body">
     <div class="row mb-3">
       <div class="col-md-8">
-        <div class="fw-bold fs-5">{{ branch.name if branch else 'MediCore Hospital' }}</div>
+        <div class="fw-bold fs-5">{{ branch.name if branch else 'Revive Hospital' }}</div>
         <div class="text-muted small">{{ branch.address if branch else '' }}</div>
       </div>
       <div class="col-md-4 text-end">
@@ -55,7 +55,7 @@
     <hr>
     <div class="row mt-3">
       <div class="col-md-6 small text-muted">Prepared by: {{ summary.preparer.full_name if summary and summary.preparer else '—' }}</div>
-      <div class="col-md-6 text-end small text-muted">MediCore ERP — {{ now.strftime('%d-%m-%Y %H:%M') }}</div>
+      <div class="col-md-6 text-end small text-muted">Revive ERP — {{ now.strftime('%d-%m-%Y %H:%M') }}</div>
     </div>
   </div>
 </div>

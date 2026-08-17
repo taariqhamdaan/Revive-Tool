@@ -1,4 +1,4 @@
-# MediCore - app/blueprints/patients/routes.py
+# Revive - app/blueprints/patients/routes.py
 # Patient management: register, view, edit, search, bulk upload, download template.
 # Logic summary:
 #   - List: paginated, filtered by name/phone/UHID, branch-scoped

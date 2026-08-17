@@ -1,4 +1,4 @@
-# MediCore - app/utils/bulk_upload.py
+# Revive - app/utils/bulk_upload.py
 # Bulk upload processor for Excel/CSV files.
 # Handles patients, drugs, employees, test master, etc.
 # Returns structured result: success_count, error_count, error_rows (for user feedback).

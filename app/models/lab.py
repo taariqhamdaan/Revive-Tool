@@ -1,4 +1,4 @@
-# MediCore - app/models/lab.py
+# Revive - app/models/lab.py
 # Laboratory: Test master, panels, sample collection, results, report templates.
 
 from datetime import datetime, timezone

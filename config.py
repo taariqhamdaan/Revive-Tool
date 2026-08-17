@@ -1,4 +1,4 @@
-# MediCore - config.py
+# Revive - config.py
 # Environment-based configuration. Reads from .env file.
 
 import os
@@ -18,7 +18,7 @@ class Config:
 
     # ── Database ──────────────────────────────────────────────────────────
     SQLALCHEMY_DATABASE_URI = os.environ.get(
-        "DATABASE_URL", "postgresql://medicore_user:password@localhost:5432/medicore_db"
+        "DATABASE_URL", "postgresql://revive_user:password@localhost:5432/revive_db"
     )
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_ENGINE_OPTIONS = {
@@ -41,7 +41,7 @@ class Config:
     MAIL_USE_TLS = os.environ.get("MAIL_USE_TLS", "1") == "1"
     MAIL_USERNAME = os.environ.get("MAIL_USERNAME")
     MAIL_PASSWORD = os.environ.get("MAIL_PASSWORD")
-    MAIL_DEFAULT_SENDER = os.environ.get("MAIL_DEFAULT_SENDER", "MediCore <noreply@medicore.local>")
+    MAIL_DEFAULT_SENDER = os.environ.get("MAIL_DEFAULT_SENDER", "Revive <noreply@revive.local>")
 
     # ── File Uploads ──────────────────────────────────────────────────────
     # Vercel's function filesystem is read-only outside /tmp.

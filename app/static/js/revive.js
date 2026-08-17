@@ -1,4 +1,4 @@
-/* MediCore JS v2.0 — Rivive design aligned */
+/* Revive JS v2.0 — Rivive design aligned */
 
 document.addEventListener('DOMContentLoaded', function () {
 

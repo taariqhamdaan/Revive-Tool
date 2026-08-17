@@ -1,4 +1,4 @@
-# MediCore - app/blueprints/dashboard/routes.py
+# Revive - app/blueprints/dashboard/routes.py
 # Dashboard: main landing page after login.
 # Logic summary:
 #   - SuperAdmin: sees all-branch aggregated stats

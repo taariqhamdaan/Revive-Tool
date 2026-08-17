@@ -1,4 +1,4 @@
-# MediCore - app/blueprints/settings/routes.py
+# Revive - app/blueprints/settings/routes.py
 # Settings & CMS Panel. Tabs: Branches, Users, Roles & Permissions,
 # System Settings, Email Templates, Audit Logs, Theme.
 # Logic summary:

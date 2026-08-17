@@ -16,7 +16,7 @@ instance/
 *.sqlite3
 rivive.db
 
-# MediCore local runtime dirs
+# Revive local runtime dirs
 logs/
 uploads/
 exports/

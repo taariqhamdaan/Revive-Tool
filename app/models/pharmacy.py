@@ -1,4 +1,4 @@
-# MediCore - app/models/pharmacy.py
+# Revive - app/models/pharmacy.py
 # Pharmacy: Drug master, categories, suppliers, purchase orders,
 # GRN (Goods Received Note), stock ledger, dispensing.
 

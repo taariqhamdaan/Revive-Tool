@@ -1,4 +1,4 @@
-# MediCore - app/blueprints/hr/routes.py
+# Revive - app/blueprints/hr/routes.py
 # HR Module: Employee list, register, edit, attendance, leave management.
 
 from datetime import date, datetime, timezone

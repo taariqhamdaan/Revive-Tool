@@ -1,4 +1,4 @@
-# Revive Tool — MediCore (v4.1)
+# Revive Tool — Revive (v4.1)
 
 Full Hospital Management System covering registration, OPD, IPD, pharmacy, lab,
 radiology, billing, insurance, HR, payroll, reports and settings, built with

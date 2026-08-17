@@ -1,4 +1,4 @@
-# MediCore - app/blueprints/reports/routes.py
+# Revive - app/blueprints/reports/routes.py
 # Reports — matches Rivive Hospital PDF spec exactly.
 # Sections: OP Service, IP Service, Appointment, Patient, Referral, Insurance
 # Each section has sub-reports with date-range filters + Excel/PDF export.
@@ -293,7 +293,7 @@ def export():
     buf.seek(0)
 
     log_action("EXPORT","reports",notes=f"Exported {report_type} {df}–{dt}")
-    fname = f"MediCore_{report_type}_{df}_{dt}.xlsx"
+    fname = f"Revive_{report_type}_{df}_{dt}.xlsx"
     return send_file(buf, mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                      as_attachment=True, download_name=fname)
 

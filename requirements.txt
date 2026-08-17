@@ -1,4 +1,4 @@
-# MediCore - Requirements
+# Revive - Requirements
 # Python 3.10+
 
 # Core Framework

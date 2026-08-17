@@ -1,4 +1,4 @@
-# MediCore - app/utils/email.py
+# Revive - app/utils/email.py
 # Email service. Sends via Flask-Mail using templates stored in DB.
 # Variables in templates use {{variable_name}} syntax.
 # All sends are logged. Failures do not break the main request.
@@ -123,7 +123,7 @@ def send_password_reset_email(user, reset_url: str) -> bool:
         variables={
             "user_name": user.full_name,
             "reset_url": reset_url,
-            "app_name": current_app.config.get("APP_NAME", "MediCore"),
+            "app_name": current_app.config.get("APP_NAME", "Revive"),
         },
     )
 

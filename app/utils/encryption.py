@@ -1,4 +1,4 @@
-# MediCore - app/utils/encryption.py
+# Revive - app/utils/encryption.py
 # Field-level encryption for sensitive patient/employee data (Aadhaar, bank accounts).
 # Uses Fernet symmetric encryption (AES-128-CBC + HMAC-SHA256).
 # Key is loaded from environment — never hardcoded.

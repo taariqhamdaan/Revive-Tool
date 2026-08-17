@@ -1,4 +1,4 @@
-# MediCore - app/models/foundation.py
+# Revive - app/models/foundation.py
 # Foundation tables: Branches, Departments, Designations, SystemSettings, EmailTemplates
 # These are the root reference tables that everything else depends on.
 

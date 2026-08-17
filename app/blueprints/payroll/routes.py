@@ -1,4 +1,4 @@
-# MediCore - app/blueprints/payroll/routes.py
+# Revive - app/blueprints/payroll/routes.py
 # Payroll: salary components, structures, monthly run, payslip generation.
 
 from datetime import date, datetime, timezone

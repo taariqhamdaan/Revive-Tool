@@ -1,4 +1,4 @@
-# MediCore - app/models/hr.py
+# Revive - app/models/hr.py
 # HR: Employee master, attendance, leave types, leave requests, shifts.
 
 from datetime import datetime, timezone
