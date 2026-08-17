@@ -1,0 +1,20 @@
+{# Shared report date-range filter + export bar #}
+<div class="mc-card mb-3">
+  <div class="mc-card-body py-2">
+    <form method="GET" class="d-flex gap-2 align-items-center flex-wrap">
+      {% for k,v in request.args.items() %}{% if k not in ['date_from','date_to'] %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endif %}{% endfor %}
+      <label class="mc-label mb-0 small">From</label>
+      <input type="date" name="date_from" class="form-control form-control-sm" value="{{ date_from }}" style="width:150px">
+      <label class="mc-label mb-0 small">To</label>
+      <input type="date" name="date_to" class="form-control form-control-sm" value="{{ date_to }}" style="width:150px">
+      <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-search me-1"></i>Apply</button>
+      <a href="{{ url_for('reports.export', type=report_type, date_from=date_from, date_to=date_to) }}"
+         class="btn btn-outline-success btn-sm no-print">
+        <i class="bi bi-file-earmark-excel me-1"></i>Excel
+      </a>
+      <button type="button" class="btn btn-outline-secondary btn-sm no-print" data-print>
+        <i class="bi bi-printer me-1"></i>Print
+      </button>
+    </form>
+  </div>
+</div>

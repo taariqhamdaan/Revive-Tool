@@ -1,0 +1,33 @@
+{% extends "shared/base.html" %}
+{% block title %}Radiology Report{% endblock %}
+{% block content %}
+<div class="mc-page-header">
+  <h1 class="mc-page-title"><i class="bi bi-activity"></i> Enter Radiology Report — {{ order.order_number }}</h1>
+  <a href="{{ url_for('radiology.index') }}" class="btn btn-outline-secondary btn-sm">← Back</a>
+</div>
+<div class="mc-card mb-3"><div class="mc-card-body py-2 px-3">
+  <div class="d-flex gap-3 align-items-center">
+    <div><div class="fw-bold">{{ patient.full_name if patient else '—' }} <span class="mc-uhid ms-2">{{ patient.uhid if patient else '' }}</span></div>
+    <div class="small text-muted">{{ order.investigation.name if order.investigation else '—' }} | Priority: <strong>{{ order.priority|title }}</strong></div>
+    {% if order.clinical_info %}<div class="small text-muted mt-1">Clinical: {{ order.clinical_info }}</div>{% endif %}
+    </div>
+  </div>
+</div></div>
+<form method="POST" action="{{ url_for('radiology.enter_report', order_id=order.id) }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+<div class="row g-3">
+  <div class="col-lg-8">
+    <div class="mc-card mb-3"><div class="mc-card-header"><i class="bi bi-search"></i> Findings</div>
+    <div class="mc-card-body"><textarea name="findings" class="form-control" rows="8" placeholder="Detailed radiological findings…">{{ report.findings if report else '' }}</textarea></div></div>
+    <div class="mc-card"><div class="mc-card-header"><i class="bi bi-clipboard-check"></i> Impression / Conclusion</div>
+    <div class="mc-card-body"><textarea name="impression" class="form-control" rows="4" placeholder="Radiologist's impression and conclusion…">{{ report.impression if report else '' }}</textarea></div></div>
+  </div>
+  <div class="col-lg-4">
+    <div class="mc-card"><div class="mc-card-body d-grid gap-2">
+      <button type="submit" class="btn btn-primary py-2"><i class="bi bi-floppy me-1"></i>Save Report</button>
+      <a href="{{ url_for('radiology.index') }}" class="btn btn-outline-secondary">Cancel</a>
+    </div></div>
+  </div>
+</div>
+</form>
+{% endblock %}

@@ -16,6 +16,12 @@ instance/
 *.sqlite3
 rivive.db
 
+# MediCore local runtime dirs
+logs/
+uploads/
+exports/
+*.log
+
 # Environment secrets — never commit
 .env
 .env.local

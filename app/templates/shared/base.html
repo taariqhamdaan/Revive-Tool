@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="{{ session.get('lang','en') }}">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="csrf-token" content="{{ csrf_token() }}">
+  <title>{% block title %}Rivive{% endblock %} — {{ app_name }}</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdn.datatables.net/1.13.8/css/dataTables.bootstrap5.min.css">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/medicore.css') }}">
+  {% if current_user.is_authenticated and current_user.branch %}
+  <style>:root{--mc-primary:{{ current_user.branch.theme_primary or '#1a3a5c' }};--mc-accent:{{ current_user.branch.theme_accent or '#0ea5b0' }};}</style>
+  {% endif %}
+  {% block head %}{% endblock %}
+</head>
+<body>
+
+{% if current_user.is_authenticated %}
+
+<!-- ══ TOP NAVIGATION BAR ══════════════════════════════════════════════════ -->
+<nav class="mc-topnav">
+  <!-- Brand -->
+  <a href="{{ url_for('dashboard.index') }}" class="mc-brand">
+    <i class="bi bi-hospital-fill mc-brand-icon"></i>
+    <span class="mc-brand-text">RIVIVE <span class="mc-brand-accent">SCH</span></span>
+  </a>
+
+  <!-- Primary nav items (from Rivive PDF: Home, Hospital, Billing, Transactions, Reports, Settings, Dashboard, Expense) -->
+  <a href="{{ url_for('dashboard.index') }}"
+     class="mc-nav-item {% if request.blueprint == 'dashboard' %}active{% endif %}">
+    <i class="bi bi-house"></i><span>Home</span>
+  </a>
+
+  {% if current_user.has_permission('patients','view') or current_user.has_permission('opd','view') %}
+  <a href="{{ url_for('opd.index') }}"
+     class="mc-nav-item {% if request.blueprint in ['opd','patients','ipd'] %}active{% endif %}">
+    <i class="bi bi-hospital"></i><span>Hospital</span>
+  </a>
+  {% endif %}
+
+  {% if current_user.has_permission('billing','view') %}
+  <a href="{{ url_for('billing.index') }}"
+     class="mc-nav-item {% if request.blueprint == 'billing' %}active{% endif %}">
+    <i class="bi bi-receipt"></i><span>Billing</span>
+  </a>
+  {% endif %}
+
+  {% if current_user.has_permission('pharmacy','view') or current_user.has_permission('lab','view') %}
+  <div class="dropdown">
+    <button class="mc-nav-item {% if request.blueprint in ['pharmacy','lab','radiology','insurance'] %}active{% endif %}"
+            data-bs-toggle="dropdown">
+      <i class="bi bi-grid-3x3-gap"></i><span>Transactions</span><i class="bi bi-chevron-down ms-1 mc-caret"></i>
+    </button>
+    <ul class="dropdown-menu shadow">
+      {%- if current_user.has_permission('pharmacy','view') %}
+      <li><a class="dropdown-item" href="{{ url_for('pharmacy.index') }}"><i class="bi bi-capsule me-2"></i>Pharmacy</a></li>
+      {%- endif %}
+      {%- if current_user.has_permission('lab','view') %}
+      <li><a class="dropdown-item" href="{{ url_for('lab.index') }}"><i class="bi bi-eyedropper me-2"></i>Laboratory</a></li>
+      {%- endif %}
+      {%- if current_user.has_permission('radiology','view') %}
+      <li><a class="dropdown-item" href="{{ url_for('radiology.index') }}"><i class="bi bi-activity me-2"></i>Radiology</a></li>
+      {%- endif %}
+      {%- if current_user.has_permission('insurance','view') %}
+      <li><a class="dropdown-item" href="{{ url_for('insurance.index') }}"><i class="bi bi-shield-check me-2"></i>Insurance</a></li>
+      {%- endif %}
+    </ul>
+  </div>
+  {% endif %}
+
+  {% if current_user.has_permission('reports','view') %}
+  <a href="{{ url_for('reports.index') }}"
+     class="mc-nav-item {% if request.blueprint == 'reports' %}active{% endif %}">
+    <i class="bi bi-bar-chart-line"></i><span>Reports</span>
+  </a>
+  {% endif %}
+
+  {% if current_user.has_permission('hr','view') or current_user.has_permission('payroll','view') %}
+  <div class="dropdown">
+    <button class="mc-nav-item {% if request.blueprint in ['hr','payroll'] %}active{% endif %}"
+            data-bs-toggle="dropdown">
+      <i class="bi bi-people"></i><span>HR</span><i class="bi bi-chevron-down ms-1 mc-caret"></i>
+    </button>
+    <ul class="dropdown-menu shadow">
+      {%- if current_user.has_permission('hr','view') %}
+      <li><a class="dropdown-item" href="{{ url_for('hr.index') }}"><i class="bi bi-person-badge me-2"></i>HR Management</a></li>
+      {%- endif %}
+      {%- if current_user.has_permission('payroll','view') %}
+      <li><a class="dropdown-item" href="{{ url_for('payroll.index') }}"><i class="bi bi-cash-stack me-2"></i>Payroll</a></li>
+      {%- endif %}
+    </ul>
+  </div>
+  {% endif %}
+
+  {% if current_user.has_permission('settings','view') %}
+  <a href="{{ url_for('settings.index') }}"
+     class="mc-nav-item {% if request.blueprint == 'settings' %}active{% endif %}">
+    <i class="bi bi-gear"></i><span>Settings</span>
+  </a>
+  {% endif %}
+
+  <!-- Right side -->
+  <div class="mc-topnav-right">
+    <!-- Language toggle -->
+    <div class="mc-lang-pills">
+      <a href="{{ url_for('auth.set_language', lang='en') }}"
+         class="mc-lang-pill {% if session.get('lang','en')=='en' %}active{% endif %}">EN</a>
+      <a href="{{ url_for('auth.set_language', lang='ta') }}"
+         class="mc-lang-pill {% if session.get('lang','en')=='ta' %}active{% endif %}">த</a>
+    </div>
+
+    <!-- Branch -->
+    {% if current_user.branch %}
+    <span class="mc-datetime mc-branch-tag">
+      <i class="bi bi-building me-1"></i>{{ current_user.branch.code }}
+    </span>
+    {% endif %}
+
+    <!-- Datetime -->
+    <div class="mc-datetime" id="mc-datetime"></div>
+
+    <!-- Notifications -->
+    <a href="#" class="mc-topnav-icon" title="Saved Bills">
+      <i class="bi bi-bookmark"></i>
+    </a>
+    <a href="#" class="mc-topnav-icon" title="Notifications">
+      <i class="bi bi-bell"></i>
+      <span class="mc-badge"></span>
+    </a>
+
+    <!-- User dropdown -->
+    <div class="dropdown">
+      <button class="mc-user-btn" data-bs-toggle="dropdown">
+        <div class="mc-avatar">{{ current_user.full_name[0].upper() }}</div>
+        <span>{{ current_user.full_name.split()[0] }}</span>
+        <i class="bi bi-chevron-down mc-caret-soft"></i>
+      </button>
+      <ul class="dropdown-menu dropdown-menu-end shadow">
+        <li><h6 class="dropdown-header">{{ current_user.full_name }}</h6></li>
+        <li><span class="dropdown-item-text text-muted mc-dropdown-subtext">
+          {{ current_user.role.name if current_user.role else '' }}
+        </span></li>
+        <li><hr class="dropdown-divider"></li>
+        <li><a class="dropdown-item" href="{{ url_for('auth.change_password') }}">
+          <i class="bi bi-key me-2"></i>Change Password</a></li>
+        <li><hr class="dropdown-divider"></li>
+        <li><a class="dropdown-item text-danger" href="{{ url_for('auth.logout') }}">
+          <i class="bi bi-box-arrow-right me-2"></i>Logout</a></li>
+      </ul>
+    </div>
+  </div>
+</nav>
+<!-- ══ END TOP NAV ══════════════════════════════════════════════════════════ -->
+
+<!-- Sub nav (module-level tabs, injected per blueprint) -->
+{% block subnav %}{% endblock %}
+
+<!-- Flash messages -->
+<div class="mc-flash-zone">
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for cat, msg in messages %}
+    <div class="alert alert-{{ 'danger' if cat=='error' else cat }} alert-dismissible fade show mc-flash" role="alert">
+      <i class="bi bi-{% if cat=='success' %}check-circle{% elif cat=='danger' %}x-circle{% elif cat=='warning' %}exclamation-triangle{% else %}info-circle{% endif %}"></i>
+      {{ msg }}
+      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+    {% endfor %}
+  {% endwith %}
+</div>
+
+<!-- Page layout: optional left panel + main content -->
+<div class="mc-layout">
+  {% block left_panel %}{% endblock %}
+  <div class="mc-main-content">
+    {% block content %}{% endblock %}
+  </div>
+</div>
+
+{% else %}
+<!-- Unauthenticated pages -->
+<div class="mc-auth-wrap">
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for cat, msg in messages %}
+    <div class="alert alert-{{ cat }} alert-dismissible fade show mb-3 w-100 mc-alert-narrow" role="alert">
+      {{ msg }}<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+    {% endfor %}
+  {% endwith %}
+  {{ self.content() }}
+</div>
+{% endif %}
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.8/js/dataTables.bootstrap5.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+<script src="{{ url_for('static', filename='js/medicore.js') }}"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

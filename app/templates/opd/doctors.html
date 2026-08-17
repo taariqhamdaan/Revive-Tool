@@ -1,0 +1,98 @@
+{% extends "shared/base.html" %}
+{% block title %}Doctors{% endblock %}
+{% block content %}
+<div class="mc-page-header">
+  <h1 class="mc-page-title"><i class="bi bi-person-badge"></i> Doctors List</h1>
+  <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addDoctorModal">
+    <i class="bi bi-plus-circle me-1"></i>Add Doctor
+  </button>
+</div>
+<div class="mc-card">
+  <div class="mc-card-body p-0">
+    <div class="mc-table-wrap">
+      <table class="mc-table mc-datatable">
+        <thead><tr><th>Code</th><th>Doctor</th><th>Specialisation</th><th>Qualification</th><th>Reg. No.</th><th>Dept</th><th>Consult Fee</th><th>Status</th></tr></thead>
+        <tbody>
+          {% for d in doctors %}
+          <tr>
+            <td><span class="mc-uhid">{{ d.doctor_code }}</span></td>
+            <td class="fw-semibold">{{ d.title }} {{ d.full_name }}</td>
+            <td>{{ d.specialisation or '—' }}</td>
+            <td class="small text-muted">{{ d.qualification or '—' }}</td>
+            <td class="small">{{ d.reg_number or '—' }}</td>
+            <td class="small">{{ d.department.name if d.department else '—' }}</td>
+            <td>₹{{ "%.2f"|format(d.consultation_fee or 0) }}</td>
+            <td><span class="mc-badge {% if d.is_active %}mc-badge-active{% else %}mc-badge-inactive{% endif %}">{{ 'Active' if d.is_active else 'Inactive' }}</span></td>
+          </tr>
+          {% else %}
+          <tr><td colspan="8" class="text-center text-muted py-4">No doctors registered yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Add Doctor Modal -->
+<div class="modal fade" id="addDoctorModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">Add Doctor</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <form method="POST" action="{{ url_for('opd.doctor_save') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="modal-body">
+          <div class="row g-3">
+            <div class="col-md-2">
+              <label class="mc-label">Title</label>
+              <select name="title" class="form-select">
+                <option>Dr.</option><option>Prof.</option><option>Mr.</option><option>Ms.</option>
+              </select>
+            </div>
+            <div class="col-md-5">
+              <label class="mc-label required">Full Name</label>
+              <input type="text" name="full_name" class="form-control" required>
+            </div>
+            <div class="col-md-5">
+              <label class="mc-label">Full Name (Tamil)</label>
+              <input type="text" name="full_name_ta" class="form-control">
+            </div>
+            <div class="col-md-6">
+              <label class="mc-label">Specialisation</label>
+              <input type="text" name="specialisation" class="form-control" placeholder="e.g. Orthopaedics">
+            </div>
+            <div class="col-md-6">
+              <label class="mc-label">Qualification</label>
+              <input type="text" name="qualification" class="form-control" placeholder="MBBS, MS...">
+            </div>
+            <div class="col-md-4">
+              <label class="mc-label">Reg. No.</label>
+              <input type="text" name="reg_number" class="form-control">
+            </div>
+            <div class="col-md-4">
+              <label class="mc-label">Department</label>
+              <select name="department_id" class="form-select">
+                <option value="">— Select —</option>
+                {% for dept in departments %}
+                <option value="{{ dept.id }}">{{ dept.name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-4">
+              <label class="mc-label">Consultation Fee (₹)</label>
+              <input type="number" name="consultation_fee" class="form-control" value="0">
+            </div>
+            <div class="col-md-4">
+              <label class="mc-label">Follow-up Fee (₹)</label>
+              <input type="number" name="follow_up_fee" class="form-control" value="0">
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="bi bi-check-circle me-1"></i>Save Doctor</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,19 @@
+{% extends "shared/base.html" %}
+{% block title %}Upload Result{% endblock %}
+{% block content %}
+<div class="mc-page-header"><h1 class="mc-page-title"><i class="bi bi-clipboard-check"></i> Upload Result</h1></div>
+<div class="row g-3 mb-4">
+  <div class="col-md-4"><div class="mc-stat"><div class="mc-stat-icon green"><i class="bi bi-check-circle"></i></div><div><div class="mc-stat-val">{{ result.success_count }}</div><div class="mc-stat-lbl">Successfully Imported</div></div></div></div>
+  <div class="col-md-4"><div class="mc-stat"><div class="mc-stat-icon red"><i class="bi bi-x-circle"></i></div><div><div class="mc-stat-val">{{ result.error_count }}</div><div class="mc-stat-lbl">Rows with Errors</div></div></div></div>
+</div>
+{% if result.errors %}
+<div class="mc-card"><div class="mc-card-header text-danger"><i class="bi bi-exclamation-triangle"></i> Errors</div>
+<div class="mc-card-body p-0"><table class="mc-table"><thead><tr><th>Row</th><th>Error</th></tr></thead><tbody>
+{% for e in result.errors %}<tr><td><span class="badge bg-danger">Row {{ e.row }}</span></td><td class="small text-danger">{{ e.error }}</td></tr>{% endfor %}
+</tbody></table></div></div>
+{% endif %}
+<div class="d-flex gap-2 mt-3">
+  <a href="{{ url_for('hr.bulk_upload') }}" class="btn btn-outline-primary">Upload Another</a>
+  <a href="{{ url_for('hr.index') }}" class="btn btn-primary">Go to HR</a>
+</div>
+{% endblock %}

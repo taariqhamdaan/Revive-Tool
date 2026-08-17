@@ -1,0 +1,272 @@
+{% extends "shared/base.html" %}
+{% block title %}{{ patient.full_name }}{% endblock %}
+
+{% block content %}
+<div class="mc-page-header">
+  <div>
+    <h1 class="mc-page-title">
+      <i class="bi bi-person-circle me-2"></i>{{ patient.full_name }}
+      <span class="mc-uhid ms-2">{{ patient.uhid }}</span>
+    </h1>
+    <div class="mc-breadcrumb">
+      <a href="{{ url_for('patients.index') }}">Patients</a> / {{ patient.uhid }}
+    </div>
+  </div>
+  <div class="d-flex gap-2 flex-wrap">
+    {% if current_user.has_permission('opd','create') %}
+    <a href="{{ url_for('opd.index') }}?patient_id={{ patient.id }}" class="btn btn-success btn-sm">
+      <i class="bi bi-calendar-plus me-1"></i>Book Appointment
+    </a>
+    {% endif %}
+    {% if current_user.has_permission('patients','edit') %}
+    <a href="{{ url_for('patients.edit', patient_id=patient.id) }}" class="btn btn-outline-primary btn-sm">
+      <i class="bi bi-pencil me-1"></i>Edit
+    </a>
+    {% endif %}
+    <button class="btn btn-outline-secondary btn-sm" data-print>
+      <i class="bi bi-printer me-1"></i>Print
+    </button>
+  </div>
+</div>
+
+<!-- Profile summary strip -->
+<div class="mc-card mb-3">
+  <div class="mc-card-body">
+    <div class="row align-items-center g-3">
+      <div class="col-auto">
+        <div class="mc-stat-icon blue" style="width:60px;height:60px;font-size:1.8rem">
+          <i class="bi bi-person"></i>
+        </div>
+      </div>
+      <div class="col">
+        <div class="fw-bold fs-5">{{ patient.full_name }}</div>
+        <div class="text-muted small">
+          {{ patient.gender or '—' }} &nbsp;|&nbsp;
+          {% if patient.date_of_birth %}{{ patient.date_of_birth.strftime('%d %b %Y') }}{% elif patient.age_years %}{{ patient.age_years }} yrs{% else %}Age N/A{% endif %}
+          &nbsp;|&nbsp; Blood: {{ patient.blood_group or '—' }}
+        </div>
+        <div class="mt-1">
+          <i class="bi bi-telephone me-1"></i>{{ patient.phone }}
+          {% if patient.email %}<span class="ms-3"><i class="bi bi-envelope me-1"></i>{{ patient.email }}</span>{% endif %}
+        </div>
+      </div>
+      <div class="col-auto text-end">
+        <div class="text-muted small">Registered</div>
+        <div class="fw-semibold">{{ patient.created_at.strftime('%d %b %Y') if patient.created_at }}</div>
+        {% if patient.abha_number %}
+        <div class="badge bg-info mt-1">ABHA: {{ patient.abha_number }}</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Allergy warning -->
+{% if allergies %}
+<div class="alert alert-danger d-flex align-items-center gap-2 mb-3">
+  <i class="bi bi-exclamation-triangle-fill fs-5"></i>
+  <div>
+    <strong>Known Allergies:</strong>
+    {% for a in allergies %}
+    <span class="badge bg-danger ms-1">{{ a.allergen }} ({{ a.severity }})</span>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<!-- Tabs -->
+<div class="mc-tabs" id="patientTabs">
+  {% for tab in ['Overview','History','Appointments','Documents','Insurance'] %}
+  <div class="mc-tab {% if loop.first %}active{% endif %}" data-tab="{{ tab | lower }}">{{ tab }}</div>
+  {% endfor %}
+</div>
+
+<!-- Overview Tab -->
+<div class="mc-tab-content" id="tab-overview">
+  <div class="row g-3">
+    <div class="col-md-6">
+      <div class="mc-card">
+        <div class="mc-card-header"><i class="bi bi-person-vcard"></i> Demographics</div>
+        <div class="mc-card-body">
+          {% set rows = [
+            ('Gender',         patient.gender or '—'),
+            ('Date of Birth',  patient.date_of_birth.strftime('%d %b %Y') if patient.date_of_birth else '—'),
+            ('Age',            (patient.age_years|string + ' years') if patient.age_years else '—'),
+            ('Blood Group',    patient.blood_group or '—'),
+            ('Marital Status', patient.marital_status or '—'),
+            ('Religion',       patient.religion or '—'),
+            ('Occupation',     patient.occupation or '—'),
+            ('Nationality',    patient.nationality or 'Indian'),
+            ('Aadhaar',        patient.aadhaar_masked or '—'),
+            ('ABHA No.',       patient.abha_number or '—'),
+          ] %}
+          <dl class="row mb-0">
+            {% for label, value in rows %}
+            <dt class="col-sm-5 text-muted small">{{ label }}</dt>
+            <dd class="col-sm-7 small mb-1">{{ value }}</dd>
+            {% endfor %}
+          </dl>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-6">
+      <div class="mc-card">
+        <div class="mc-card-header"><i class="bi bi-geo-alt"></i> Contact & Address</div>
+        <div class="mc-card-body">
+          {% set rows2 = [
+            ('Primary Phone',  patient.phone),
+            ('Alternate Phone',patient.phone_alt or '—'),
+            ('Email',          patient.email or '—'),
+            ('Address',        patient.address or '—'),
+            ('City',           patient.city or '—'),
+            ('State',          patient.state or '—'),
+            ('Pincode',        patient.pincode or '—'),
+          ] %}
+          <dl class="row mb-0">
+            {% for label, value in rows2 %}
+            <dt class="col-sm-5 text-muted small">{{ label }}</dt>
+            <dd class="col-sm-7 small mb-1">{{ value }}</dd>
+            {% endfor %}
+          </dl>
+        </div>
+      </div>
+
+      <!-- Emergency contacts -->
+      {% if contacts %}
+      <div class="mc-card mt-3">
+        <div class="mc-card-header"><i class="bi bi-person-heart"></i> Emergency Contacts</div>
+        <div class="mc-card-body">
+          {% for c in contacts %}
+          <div class="{% if not loop.last %}border-bottom pb-2 mb-2{% endif %}">
+            <div class="fw-semibold">{{ c.name }} <span class="badge bg-secondary ms-1" style="font-size:.65rem">{{ c.relationship }}</span></div>
+            <div class="small text-muted"><i class="bi bi-telephone me-1"></i>{{ c.phone }}</div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- History Tab -->
+<div class="mc-tab-content d-none" id="tab-history">
+  <div class="mc-card">
+    <div class="mc-card-header"><i class="bi bi-clipboard2-pulse"></i> Medical History</div>
+    <div class="mc-card-body">
+      {% if history %}
+      <table class="mc-table">
+        <thead><tr><th>Type</th><th>Description</th><th>Since</th><th>Status</th><th>Noted By</th></tr></thead>
+        <tbody>
+          {% for h in history %}
+          <tr>
+            <td><span class="badge bg-secondary">{{ h.history_type | title }}</span></td>
+            <td>{{ h.description }}</td>
+            <td class="small text-muted">{{ h.since_date.strftime('%b %Y') if h.since_date else '—' }}</td>
+            <td>{% if h.is_resolved %}<span class="badge bg-success">Resolved</span>{% else %}<span class="badge bg-warning text-dark">Active</span>{% endif %}</td>
+            <td class="small text-muted">{{ h.noted_at.strftime('%d %b %Y') if h.noted_at else '—' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <p class="text-muted text-center mb-0"><i class="bi bi-clipboard2 me-1"></i>No medical history recorded.</p>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- Appointments Tab -->
+<div class="mc-tab-content d-none" id="tab-appointments">
+  <div class="mc-card">
+    <div class="mc-card-header"><i class="bi bi-calendar3"></i> Recent Appointments</div>
+    <div class="mc-card-body">
+      {% if appointments %}
+      <table class="mc-table">
+        <thead><tr><th>Date</th><th>Doctor</th><th>Type</th><th>Token</th><th>Status</th></tr></thead>
+        <tbody>
+          {% for a in appointments %}
+          <tr>
+            <td>{{ a.appointment_date.strftime('%d %b %Y') }}</td>
+            <td>{{ a.doctor.full_name if a.doctor else '—' }}</td>
+            <td><span class="badge bg-info text-dark">{{ a.visit_type | title }}</span></td>
+            <td>{{ a.token_number or '—' }}</td>
+            <td><span class="badge status-{{ a.status }}">{{ a.status | title }}</span></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <p class="text-muted text-center mb-0">No appointments on record.</p>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- Documents Tab -->
+<div class="mc-tab-content d-none" id="tab-documents">
+  <div class="mc-card">
+    <div class="mc-card-header"><i class="bi bi-folder2"></i> Documents</div>
+    <div class="mc-card-body">
+      {% if documents %}
+      <div class="row g-2">
+        {% for d in documents %}
+        <div class="col-md-4">
+          <div class="border rounded p-2 d-flex align-items-center gap-2">
+            <i class="bi bi-file-earmark fs-4 text-primary"></i>
+            <div class="flex-fill overflow-hidden">
+              <div class="fw-semibold small text-truncate">{{ d.doc_name }}</div>
+              <div class="text-muted" style="font-size:.7rem">{{ d.doc_type | title }} • {{ d.uploaded_at.strftime('%d %b %Y') if d.uploaded_at }}</div>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p class="text-muted text-center mb-0">No documents uploaded.</p>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- Insurance Tab -->
+<div class="mc-tab-content d-none" id="tab-insurance">
+  <div class="mc-card">
+    <div class="mc-card-header"><i class="bi bi-shield-check"></i> Insurance / TPA</div>
+    <div class="mc-card-body">
+      {% if insurance %}
+      {% for ins in insurance %}
+      <div class="border rounded p-3 {% if not loop.last %}mb-3{% endif %}">
+        <div class="fw-semibold">{{ ins.insurer_name or '—' }}
+          {% if ins.is_primary %}<span class="badge bg-primary ms-2">Primary</span>{% endif %}
+        </div>
+        <div class="row mt-2 small text-muted">
+          <div class="col-md-4">Policy: <strong>{{ ins.policy_number or '—' }}</strong></div>
+          <div class="col-md-4">Member ID: <strong>{{ ins.member_id or '—' }}</strong></div>
+          <div class="col-md-4">Valid: <strong>{{ ins.valid_from }} to {{ ins.valid_to }}</strong></div>
+        </div>
+      </div>
+      {% endfor %}
+      {% else %}
+      <p class="text-muted text-center mb-0">No insurance records.</p>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Tab switching
+document.querySelectorAll('.mc-tab').forEach(function(tab) {
+  tab.addEventListener('click', function() {
+    document.querySelectorAll('.mc-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.mc-tab-content').forEach(c => c.classList.add('d-none'));
+    this.classList.add('active');
+    const target = document.getElementById('tab-' + this.dataset.tab);
+    if (target) target.classList.remove('d-none');
+  });
+});
+</script>
+{% endblock %}

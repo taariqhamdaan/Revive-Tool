@@ -1,0 +1,71 @@
+{% extends "shared/base.html" %}
+{% block title %}Edit Patient{% endblock %}
+{% block content %}
+<div class="mc-page-header">
+  <div>
+    <h1 class="mc-page-title"><i class="bi bi-pencil-square"></i> Edit Patient — {{ patient.full_name }}</h1>
+    <div class="mc-breadcrumb"><a href="{{ url_for('patients.index') }}">Patients</a> / <a href="{{ url_for('patients.view', patient_id=patient.id) }}">{{ patient.uhid }}</a> / Edit</div>
+  </div>
+</div>
+<form method="POST" action="{{ url_for('patients.edit', patient_id=patient.id) }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+<div class="row g-3">
+  <div class="col-lg-8">
+    <div class="mc-card mb-3">
+      <div class="mc-card-header"><i class="bi bi-person-vcard"></i> Personal Details</div>
+      <div class="mc-card-body">
+        <div class="row g-3">
+          <div class="col-md-4"><label class="mc-label required">First Name</label><input type="text" name="first_name" class="form-control" required value="{{ patient.first_name }}"></div>
+          <div class="col-md-4"><label class="mc-label">Last Name</label><input type="text" name="last_name" class="form-control" value="{{ patient.last_name or '' }}"></div>
+          <div class="col-md-4"><label class="mc-label">Gender</label>
+            <select name="gender" class="form-select">
+              <option value="">—</option>
+              {% for g in ['Male','Female','Other'] %}<option value="{{ g }}" {% if patient.gender==g %}selected{% endif %}>{{ g }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="col-md-3"><label class="mc-label">Date of Birth</label><input type="date" name="date_of_birth" class="form-control" value="{{ patient.date_of_birth.isoformat() if patient.date_of_birth else '' }}"></div>
+          <div class="col-md-2"><label class="mc-label">Age (yrs)</label><input type="number" name="age_years" class="form-control" value="{{ patient.age_years or '' }}"></div>
+          <div class="col-md-3"><label class="mc-label">Blood Group</label>
+            <select name="blood_group" class="form-select">
+              <option value="">—</option>
+              {% for bg in ['A+','A-','B+','B-','AB+','AB-','O+','O-'] %}<option value="{{ bg }}" {% if patient.blood_group==bg %}selected{% endif %}>{{ bg }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="col-md-4"><label class="mc-label">Occupation</label><input type="text" name="occupation" class="form-control" value="{{ patient.occupation or '' }}"></div>
+        </div>
+      </div>
+    </div>
+    <div class="mc-card mb-3">
+      <div class="mc-card-header"><i class="bi bi-telephone"></i> Contact Details</div>
+      <div class="mc-card-body">
+        <div class="row g-3">
+          <div class="col-md-4"><label class="mc-label required">Primary Phone</label><input type="tel" name="phone" class="form-control" required value="{{ patient.phone }}"></div>
+          <div class="col-md-4"><label class="mc-label">Alternate Phone</label><input type="tel" name="phone_alt" class="form-control" value="{{ patient.phone_alt or '' }}"></div>
+          <div class="col-md-4"><label class="mc-label">Email</label><input type="email" name="email" class="form-control" value="{{ patient.email or '' }}"></div>
+          <div class="col-12"><label class="mc-label">Address</label><textarea name="address" class="form-control" rows="2">{{ patient.address or '' }}</textarea></div>
+          <div class="col-md-4"><label class="mc-label">City</label><input type="text" name="city" class="form-control" value="{{ patient.city or '' }}"></div>
+          <div class="col-md-4"><label class="mc-label">State</label><input type="text" name="state" class="form-control" value="{{ patient.state or 'Tamil Nadu' }}"></div>
+          <div class="col-md-4"><label class="mc-label">Pincode</label><input type="text" name="pincode" class="form-control" value="{{ patient.pincode or '' }}" maxlength="6"></div>
+          <div class="col-md-6"><label class="mc-label">ABHA Number</label><input type="text" name="abha_number" class="form-control" value="{{ patient.abha_number or '' }}"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-4">
+    <div class="mc-card mb-3">
+      <div class="mc-card-header"><i class="bi bi-fingerprint"></i> Patient ID</div>
+      <div class="mc-card-body">
+        <p class="mb-0 fw-semibold"><span class="mc-uhid">{{ patient.uhid }}</span></p>
+        <p class="text-muted small mt-1">UHID cannot be changed.</p>
+      </div>
+    </div>
+    <div class="mc-card">
+      <div class="mc-card-body d-grid gap-2">
+        <button type="submit" class="btn btn-primary py-2"><i class="bi bi-floppy me-1"></i>Save Changes</button>
+        <a href="{{ url_for('patients.view', patient_id=patient.id) }}" class="btn btn-outline-secondary">Cancel</a>
+      </div>
+    </div>
+  </div>
+</div>
+</form>
+{% endblock %}

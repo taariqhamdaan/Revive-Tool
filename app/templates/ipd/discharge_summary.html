@@ -1,0 +1,62 @@
+{% extends "shared/base.html" %}
+{% block title %}Discharge Summary — {{ adm.ip_number }}{% endblock %}
+{% block content %}
+<div class="mc-page-header">
+  <h1 class="mc-page-title"><i class="bi bi-file-earmark-text"></i> Discharge Summary — {{ adm.ip_number }}</h1>
+  <div class="d-flex gap-2">
+    <button class="btn btn-outline-secondary btn-sm no-print" data-print><i class="bi bi-printer me-1"></i>Print</button>
+    <a href="{{ url_for('ipd.index', tab='history') }}" class="btn btn-outline-secondary btn-sm no-print">← Back</a>
+  </div>
+</div>
+<div class="mc-card">
+  <div class="mc-card-body">
+    <div class="row mb-3">
+      <div class="col-md-8">
+        <div class="fw-bold fs-5">{{ branch.name if branch else 'MediCore Hospital' }}</div>
+        <div class="text-muted small">{{ branch.address if branch else '' }}</div>
+      </div>
+      <div class="col-md-4 text-end">
+        <div class="fw-bold text-primary">DISCHARGE SUMMARY</div>
+        <div class="small text-muted">IP Number: <strong>{{ adm.ip_number }}</strong></div>
+      </div>
+    </div>
+    <hr>
+    <div class="row g-2 small mb-3">
+      <div class="col-md-3"><strong>Patient:</strong> {{ patient.full_name if patient else '—' }}</div>
+      <div class="col-md-2"><strong>UHID:</strong> <span class="mc-uhid">{{ patient.uhid if patient else '—' }}</span></div>
+      <div class="col-md-2"><strong>Age/Sex:</strong> {{ patient.age_years or '' }}{% if patient and patient.age_years %}y{% endif %} {{ patient.gender or '' }}</div>
+      <div class="col-md-2"><strong>Doctor:</strong> {{ doctor.full_name if doctor else '—' }}</div>
+      <div class="col-md-3"><strong>Ward/Bed:</strong> {{ adm.ward.name if adm.ward else '—' }} / {{ adm.bed.bed_number if adm.bed else '—' }}</div>
+      <div class="col-md-3"><strong>Admitted:</strong> {{ adm.admission_date.strftime('%d-%m-%Y') if adm.admission_date else '—' }}</div>
+      <div class="col-md-3"><strong>Discharged:</strong> {{ adm.discharge_date.strftime('%d-%m-%Y') if adm.discharge_date else '—' }}</div>
+      <div class="col-md-2"><strong>Days:</strong> {% if adm.admission_date and adm.discharge_date %}{{ (adm.discharge_date.date() - adm.admission_date.date()).days + 1 }}{% endif %}</div>
+      <div class="col-md-4"><strong>Discharge Type:</strong> {{ adm.discharge_type|replace('_',' ')|title if adm.discharge_type else '—' }}</div>
+    </div>
+    {% if summary %}
+    {% for label, val in [
+      ('Admission Diagnosis', summary.admission_diagnosis),
+      ('Final Diagnosis', summary.final_diagnosis),
+      ('Procedures Done', summary.procedures_done),
+      ('Investigations', summary.investigations),
+      ('Treatment Given', summary.treatment_given),
+      ('Condition on Discharge', summary.condition_on_discharge),
+      ('Medications on Discharge', summary.medications_on_discharge),
+      ('Discharge Advice', summary.discharge_advice),
+      ('Follow-Up', summary.follow_up_instructions),
+    ] %}
+    {% if val %}
+    <div class="mb-2"><strong class="small">{{ label }}:</strong><p class="mb-0 small">{{ val }}</p></div>
+    {% endif %}
+    {% endfor %}
+    {% if summary.follow_up_date %}
+    <div class="mb-2"><strong class="small">Follow-Up Date:</strong> <span class="small">{{ summary.follow_up_date.strftime('%d-%m-%Y') }}</span></div>
+    {% endif %}
+    {% endif %}
+    <hr>
+    <div class="row mt-3">
+      <div class="col-md-6 small text-muted">Prepared by: {{ summary.preparer.full_name if summary and summary.preparer else '—' }}</div>
+      <div class="col-md-6 text-end small text-muted">MediCore ERP — {{ now.strftime('%d-%m-%Y %H:%M') }}</div>
+    </div>
+  </div>
+</div>
+{% endblock %}

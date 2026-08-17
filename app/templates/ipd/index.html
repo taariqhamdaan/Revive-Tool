@@ -1,0 +1,378 @@
+{% extends "shared/base.html" %}
+{% block title %}IPD{% endblock %}
+
+{% block subnav %}
+<div class="mc-subnav">
+  {% for tid, lbl in [('admissions','Active Admissions'),('beds','Ward & Beds'),
+     ('notes','Daily Notes'),('discharge','Discharge'),('history','History')] %}
+  <a href="{{ url_for('ipd.index', tab=tid) }}"
+     class="mc-subnav-item {% if tab==tid %}active{% endif %}">{{ lbl }}</a>
+  {% endfor %}
+  <div class="ms-auto d-flex gap-2 pe-2">
+    {% if tab == 'admissions' and current_user.has_permission('ipd','create') %}
+    <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#admitModal">
+      <i class="bi bi-plus-circle me-1"></i>New Admission
+    </button>
+    {% elif tab == 'beds' and current_user.has_permission('ipd','create') %}
+    <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addWardModal">
+      <i class="bi bi-plus-circle me-1"></i>Add Ward
+    </button>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+
+{# ── ADMISSIONS ── #}
+{% if tab == 'admissions' %}
+<div class="mc-page-header">
+  <div>
+    <h1 class="mc-page-title"><i class="bi bi-hospital"></i> Active Admissions</h1>
+  </div>
+</div>
+
+<!-- Stats row -->
+<div class="row g-2 mb-3">
+  <div class="col-md-4"><div class="mc-stat"><div class="mc-stat-icon blue"><i class="bi bi-person-fill"></i></div><div><div class="mc-stat-val">{{ admissions.total }}</div><div class="mc-stat-lbl">Admitted Patients</div></div></div></div>
+  <div class="col-md-4"><div class="mc-stat"><div class="mc-stat-icon amber"><i class="bi bi-grid-3x3-gap"></i></div><div><div class="mc-stat-val">{{ occupied_beds }}</div><div class="mc-stat-lbl">Occupied Beds</div></div></div></div>
+  <div class="col-md-4"><div class="mc-stat"><div class="mc-stat-icon green"><i class="bi bi-grid-3x3-gap-fill"></i></div><div><div class="mc-stat-val">{{ avail_beds }}</div><div class="mc-stat-lbl">Available Beds</div></div></div></div>
+</div>
+
+<!-- Search -->
+<div class="mc-card mb-3"><div class="mc-card-body py-2">
+  <form method="GET" class="d-flex gap-2">
+    <input type="hidden" name="tab" value="admissions">
+    <input type="text" name="q" class="form-control form-control-sm" placeholder="Patient name, UHID or IP No…" value="{{ search or '' }}" style="max-width:300px">
+    <button type="submit" class="btn btn-primary btn-sm">Search</button>
+  </form>
+</div></div>
+
+<div class="mc-card">
+  <div class="mc-card-body p-0 mc-table-wrap">
+    <table class="mc-table">
+      <thead><tr><th>IP No.</th><th>Patient</th><th>Doctor</th><th>Ward / Bed</th><th>Admission Date</th><th>Days</th><th>Type</th><th>Diagnosis</th><th>Action</th></tr></thead>
+      <tbody>
+        {% for adm in admissions.items %}
+        <tr>
+          <td><span class="mc-uhid">{{ adm.ip_number }}</span></td>
+          <td>
+            <div class="fw-semibold">{{ adm.patient.full_name if adm.patient else '—' }}</div>
+            <div class="text-muted small">{{ adm.patient.uhid if adm.patient else '' }} | {{ adm.patient.phone if adm.patient else '' }}</div>
+          </td>
+          <td class="small">{{ adm.doctor.full_name if adm.doctor else '—' }}</td>
+          <td class="small">
+            <span class="fw-semibold">{{ adm.ward.name if adm.ward else '—' }}</span>
+            / Bed <strong>{{ adm.bed.bed_number if adm.bed else '—' }}</strong>
+          </td>
+          <td class="small">{{ adm.admission_date.strftime('%d %b %Y %H:%M') if adm.admission_date else '—' }}</td>
+          <td class="fw-bold">
+            {% if adm.admission_date %}{{ (today - adm.admission_date.date()).days + 1 }}d{% endif %}
+          </td>
+          <td><span class="mc-badge mc-badge-new">{{ adm.admission_type|title }}</span></td>
+          <td class="small text-muted">{{ (adm.provisional_diagnosis or '—')[:40] }}</td>
+          <td>
+            <div class="d-flex gap-1">
+              <a href="{{ url_for('ipd.daily_notes', adm_id=adm.id) }}"
+                 class="btn btn-icon btn-outline-primary" title="Daily Notes">
+                <i class="bi bi-journal-text"></i>
+              </a>
+              <a href="{{ url_for('ipd.discharge', adm_id=adm.id) }}"
+                 class="btn btn-icon btn-outline-success" title="Discharge">
+                <i class="bi bi-box-arrow-right"></i>
+              </a>
+            </div>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="9" class="text-center text-muted py-5">
+          <i class="bi bi-hospital display-6 d-block mb-2 opacity-25"></i>No active admissions.
+        </td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if admissions.pages > 1 %}
+  <div class="mc-pager">
+    <span>{{ admissions.total }} patients</span>
+    <nav><ul class="pagination pagination-sm mb-0">
+      <li class="page-item {% if not admissions.has_prev %}disabled{% endif %}"><a class="page-link" href="{{ url_for('ipd.index', tab='admissions', page=admissions.prev_num, q=search) }}">‹</a></li>
+      {% for p in admissions.iter_pages() %}{% if p %}<li class="page-item {% if p==admissions.page %}active{% endif %}"><a class="page-link" href="{{ url_for('ipd.index', tab='admissions', page=p, q=search) }}">{{ p }}</a></li>{% endif %}{% endfor %}
+      <li class="page-item {% if not admissions.has_next %}disabled{% endif %}"><a class="page-link" href="{{ url_for('ipd.index', tab='admissions', page=admissions.next_num, q=search) }}">›</a></li>
+    </ul></nav>
+  </div>
+  {% endif %}
+</div>
+
+{# ── BEDS / WARDS ── #}
+{% elif tab == 'beds' %}
+<div class="mc-page-header">
+  <h1 class="mc-page-title"><i class="bi bi-grid-3x3-gap"></i> Ward & Bed Management</h1>
+</div>
+<div class="row g-2 mb-3">
+  <div class="col-md-4"><div class="mc-stat"><div class="mc-stat-icon navy"><i class="bi bi-grid"></i></div><div><div class="mc-stat-val">{{ total_beds }}</div><div class="mc-stat-lbl">Total Beds</div></div></div></div>
+  <div class="col-md-4"><div class="mc-stat"><div class="mc-stat-icon red"><i class="bi bi-person-fill"></i></div><div><div class="mc-stat-val">{{ occupied_beds }}</div><div class="mc-stat-lbl">Occupied</div></div></div></div>
+  <div class="col-md-4"><div class="mc-stat"><div class="mc-stat-icon green"><i class="bi bi-check-circle"></i></div><div><div class="mc-stat-val">{{ avail_beds }}</div><div class="mc-stat-lbl">Available</div></div></div></div>
+</div>
+{% for ward in wards %}
+<div class="mc-card mb-3">
+  <div class="mc-card-header">
+    <i class="bi bi-door-open"></i> {{ ward.name }}
+    <span class="mc-uhid ms-2">{{ ward.ward_code }}</span>
+    <span class="badge bg-secondary ms-2">{{ ward.ward_type|title }}</span>
+    <span class="text-muted small ms-2">Floor: {{ ward.floor or '—' }}</span>
+    <span class="ms-auto small text-muted">₹{{ "{:,.0f}".format(ward.charge_per_day or 0) }}/day</span>
+  </div>
+  <div class="mc-card-body">
+    <div class="d-flex flex-wrap gap-2">
+      {% for bed in ward.beds.filter_by(is_active=True, is_deleted=False).order_by('bed_number').all() %}
+      <div class="border rounded text-center p-2"
+           style="width:70px;background:{% if bed.status=='available' %}#d1fae5{% elif bed.status=='occupied' %}#fee2e2{% elif bed.status=='maintenance' %}#fef3c7{% else %}#f3f4f6{% endif %}">
+        <div class="fw-bold" style="font-size:.9rem">{{ bed.bed_number }}</div>
+        <div style="font-size:.65rem;color:{% if bed.status=='available' %}#065f46{% elif bed.status=='occupied' %}#991b1b{% else %}#6b7280{% endif %}">
+          {{ bed.status|title }}
+        </div>
+        {% if bed.bed_type and bed.bed_type != 'standard' %}
+        <div style="font-size:.6rem;color:#6b7280">{{ bed.bed_type|title }}</div>
+        {% endif %}
+      </div>
+      {% else %}
+      <div class="text-muted small">No beds configured for this ward.</div>
+      {% endfor %}
+    </div>
+    <div class="mt-2 small text-muted">
+      Total: {{ ward.beds.filter_by(is_active=True).count() }} |
+      Available: {{ ward.beds.filter_by(status='available', is_active=True).count() }} |
+      Occupied: {{ ward.beds.filter_by(status='occupied').count() }}
+    </div>
+  </div>
+</div>
+{% else %}
+<div class="mc-card"><div class="mc-card-body text-center py-5">
+  <i class="bi bi-grid-3x3-gap display-4 text-muted d-block mb-3 opacity-25"></i>
+  <h5 class="text-muted">No wards configured.</h5>
+  <p class="text-muted small">Add a ward to start managing beds.</p>
+  <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addWardModal">
+    <i class="bi bi-plus-circle me-1"></i>Add Ward
+  </button>
+</div></div>
+{% endfor %}
+
+{# ── NOTES ── #}
+{% elif tab == 'notes' %}
+<div class="mc-page-header">
+  <h1 class="mc-page-title"><i class="bi bi-journal-text"></i> Daily Progress Notes</h1>
+</div>
+<div class="mc-card">
+  <div class="mc-card-body p-0 mc-table-wrap">
+    <table class="mc-table">
+      <thead><tr><th>IP No.</th><th>Patient</th><th>Doctor</th><th>Ward/Bed</th><th>Days Admitted</th><th>Action</th></tr></thead>
+      <tbody>
+        {% for adm in admissions.items %}
+        <tr>
+          <td><span class="mc-uhid">{{ adm.ip_number }}</span></td>
+          <td class="fw-semibold">{{ adm.patient.full_name if adm.patient else '—' }}</td>
+          <td class="small">{{ adm.doctor.full_name if adm.doctor else '—' }}</td>
+          <td class="small">{{ adm.ward.name if adm.ward else '—' }} / {{ adm.bed.bed_number if adm.bed else '—' }}</td>
+          <td>{% if adm.admission_date %}{{ (today - adm.admission_date.date()).days + 1 }}d{% endif %}</td>
+          <td><a href="{{ url_for('ipd.daily_notes', adm_id=adm.id) }}" class="btn btn-sm btn-primary"><i class="bi bi-pencil-square me-1"></i>Add Note</a></td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6" class="text-center text-muted py-4">No active admissions.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{# ── DISCHARGE ── #}
+{% elif tab == 'discharge' %}
+<div class="mc-page-header">
+  <h1 class="mc-page-title"><i class="bi bi-box-arrow-right"></i> Discharge Patients</h1>
+</div>
+<div class="mc-card">
+  <div class="mc-card-body p-0 mc-table-wrap">
+    <table class="mc-table">
+      <thead><tr><th>IP No.</th><th>Patient</th><th>Doctor</th><th>Admitted</th><th>Days</th><th>Diagnosis</th><th>Action</th></tr></thead>
+      <tbody>
+        {% for adm in admissions.items %}
+        <tr>
+          <td><span class="mc-uhid">{{ adm.ip_number }}</span></td>
+          <td class="fw-semibold">{{ adm.patient.full_name if adm.patient else '—' }}</td>
+          <td class="small">{{ adm.doctor.full_name if adm.doctor else '—' }}</td>
+          <td class="small">{{ adm.admission_date.strftime('%d %b %Y') if adm.admission_date else '—' }}</td>
+          <td>{% if adm.admission_date %}{{ (today - adm.admission_date.date()).days + 1 }}d{% endif %}</td>
+          <td class="small text-muted">{{ (adm.provisional_diagnosis or '—')[:40] }}</td>
+          <td><a href="{{ url_for('ipd.discharge', adm_id=adm.id) }}" class="btn btn-sm btn-outline-success"><i class="bi bi-box-arrow-right me-1"></i>Discharge</a></td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7" class="text-center text-muted py-4">No active admissions.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{# ── HISTORY ── #}
+{% elif tab == 'history' %}
+<div class="mc-page-header">
+  <h1 class="mc-page-title"><i class="bi bi-clock-history"></i> Admission History</h1>
+</div>
+<div class="mc-card mb-3"><div class="mc-card-body py-2">
+  <form method="GET" class="d-flex gap-2">
+    <input type="hidden" name="tab" value="history">
+    <input type="text" name="q" class="form-control form-control-sm" placeholder="Search by patient, IP No…" value="{{ search or '' }}" style="max-width:300px">
+    <button type="submit" class="btn btn-primary btn-sm">Search</button>
+  </form>
+</div></div>
+<div class="mc-card">
+  <div class="mc-card-body p-0 mc-table-wrap">
+    <table class="mc-table mc-datatable">
+      <thead><tr><th>IP No.</th><th>Patient</th><th>Doctor</th><th>Admitted</th><th>Discharged</th><th>Days</th><th>Discharge Type</th><th>Diagnosis</th><th>Action</th></tr></thead>
+      <tbody>
+        {% for adm in admissions.items %}
+        <tr>
+          <td><span class="mc-uhid">{{ adm.ip_number }}</span></td>
+          <td class="fw-semibold">{{ adm.patient.full_name if adm.patient else '—' }}</td>
+          <td class="small">{{ adm.doctor.full_name if adm.doctor else '—' }}</td>
+          <td class="small">{{ adm.admission_date.strftime('%d %b %Y') if adm.admission_date else '—' }}</td>
+          <td class="small">{{ adm.discharge_date.strftime('%d %b %Y') if adm.discharge_date else '—' }}</td>
+          <td class="small">
+            {% if adm.admission_date and adm.discharge_date %}
+            {{ (adm.discharge_date.date() - adm.admission_date.date()).days + 1 }}d
+            {% endif %}
+          </td>
+          <td><span class="mc-badge mc-badge-{% if adm.discharge_type=='regular' %}done{% elif adm.discharge_type=='against_advice' %}cancelled{% else %}review{% endif %}">{{ adm.discharge_type|replace('_',' ')|title if adm.discharge_type else '—' }}</span></td>
+          <td class="small text-muted">{{ (adm.final_diagnosis or '—')[:40] }}</td>
+          <td><a href="{{ url_for('ipd.discharge_summary', adm_id=adm.id) }}" class="btn btn-icon btn-outline-primary" title="View Summary"><i class="bi bi-file-earmark-text"></i></a></td>
+        </tr>
+        {% else %}
+        <tr><td colspan="9" class="text-center text-muted py-4">No historical admissions found.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+{# ══ NEW ADMISSION MODAL ══ #}
+<div class="modal fade" id="admitModal" tabindex="-1">
+<div class="modal-dialog modal-lg"><div class="modal-content">
+<div class="modal-header"><h5 class="modal-title">New IPD Admission</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+<form method="POST" action="{{ url_for('ipd.admit') }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+<div class="modal-body">
+  <div class="row g-3">
+    <div class="col-md-6">
+      <label class="mc-label required">Patient</label>
+      <div class="position-relative">
+        <input type="text" id="patient-search" class="form-control" placeholder="Search patient…" autocomplete="off">
+        <input type="hidden" name="patient_id" id="patient-id-field" required>
+        <div id="patient-results" class="position-absolute w-100 bg-white border rounded shadow-sm" style="display:none;z-index:2000;max-height:200px;overflow-y:auto"></div>
+      </div>
+    </div>
+    <div class="col-md-6">
+      <label class="mc-label required">Admitting Doctor</label>
+      <select name="doctor_id" class="form-select" required>
+        <option value="">— Select —</option>
+        {% for d in doctors or [] %}<option value="{{ d.id }}">{{ d.full_name }}{% if d.specialisation %} ({{ d.specialisation }}){% endif %}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="col-md-4">
+      <label class="mc-label required">Ward</label>
+      <select name="ward_id" class="form-select" id="wardSelect" required>
+        <option value="">— Select Ward —</option>
+        {% for w in wards or [] %}<option value="{{ w.id }}">{{ w.name }} ({{ w.ward_type|title }})</option>{% endfor %}
+      </select>
+    </div>
+    <div class="col-md-4">
+      <label class="mc-label required">Bed</label>
+      <select name="bed_id" class="form-select" id="bedSelect" required>
+        <option value="">— Select Ward first —</option>
+      </select>
+    </div>
+    <div class="col-md-4">
+      <label class="mc-label">Admission Type</label>
+      <select name="admission_type" class="form-select">
+        <option value="elective">Elective</option>
+        <option value="emergency">Emergency</option>
+        <option value="transfer">Transfer</option>
+      </select>
+    </div>
+    <div class="col-12">
+      <label class="mc-label">Provisional Diagnosis</label>
+      <input type="text" name="provisional_diagnosis" class="form-control" placeholder="Initial diagnosis">
+    </div>
+    <div class="col-12">
+      <label class="mc-label">Reason for Admission</label>
+      <textarea name="reason" class="form-control" rows="2" placeholder="Reason / chief complaint"></textarea>
+    </div>
+  </div>
+</div>
+<div class="modal-footer">
+  <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+  <button type="submit" class="btn btn-primary"><i class="bi bi-hospital me-1"></i>Admit Patient</button>
+</div>
+</form>
+</div></div></div>
+
+{# ══ ADD WARD MODAL ══ #}
+<div class="modal fade" id="addWardModal" tabindex="-1">
+<div class="modal-dialog"><div class="modal-content">
+<div class="modal-header"><h5 class="modal-title">Add Ward</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+<form method="POST" action="{{ url_for('ipd.ward_save') }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+<div class="modal-body">
+  <div class="row g-3">
+    <div class="col-md-7"><label class="mc-label required">Ward Name</label><input type="text" name="name" class="form-control" placeholder="e.g. General Ward A" required></div>
+    <div class="col-md-5"><label class="mc-label">Name (Tamil)</label><input type="text" name="name_ta" class="form-control"></div>
+    <div class="col-md-6">
+      <label class="mc-label">Ward Type</label>
+      <select name="ward_type" class="form-select">
+        {% for t in ['general','icu','maternity','paediatric','private','surgical'] %}
+        <option value="{{ t }}">{{ t|title }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="col-md-3"><label class="mc-label">Floor</label><input type="text" name="floor" class="form-control" placeholder="G, 1, 2…"></div>
+    <div class="col-md-3"><label class="mc-label">Rate/Day (₹)</label><input type="number" name="charge_per_day" class="form-control" value="0" step="0.01"></div>
+    <div class="col-md-4"><label class="mc-label">No. of Beds to Add</label><input type="number" name="bed_count" class="form-control" value="0" min="0" max="100"></div>
+    <div class="col-md-4">
+      <label class="mc-label">Bed Type</label>
+      <select name="bed_type" class="form-select">
+        {% for t in ['standard','deluxe','icu','isolation'] %}<option value="{{ t }}">{{ t|title }}</option>{% endfor %}
+      </select>
+    </div>
+  </div>
+</div>
+<div class="modal-footer">
+  <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+  <button type="submit" class="btn btn-primary">Save Ward</button>
+</div>
+</form>
+</div></div></div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Load available beds when ward selected in admit modal
+document.getElementById('wardSelect')?.addEventListener('change', function() {
+  const wardId = this.value;
+  const bedSel = document.getElementById('bedSelect');
+  bedSel.innerHTML = '<option value="">Loading…</option>';
+  if (!wardId) { bedSel.innerHTML = '<option value="">— Select Ward first —</option>'; return; }
+  fetch(`/ipd/available-beds?ward_id=${wardId}`)
+    .then(r => r.json())
+    .then(beds => {
+      bedSel.innerHTML = '<option value="">— Select Bed —</option>';
+      beds.forEach(b => {
+        const opt = document.createElement('option');
+        opt.value = b.id;
+        opt.textContent = `Bed ${b.number} (${b.type})`;
+        bedSel.appendChild(opt);
+      });
+      if (!beds.length) bedSel.innerHTML = '<option value="">No available beds</option>';
+    });
+});
+</script>
+{% endblock %}

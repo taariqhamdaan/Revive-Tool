@@ -1,0 +1,110 @@
+{% extends "shared/base.html" %}
+{% block title %}OP Service Report{% endblock %}
+
+{% block subnav %}
+<div class="mc-subnav">
+  <a href="{{ url_for('reports.index') }}" class="mc-subnav-item"><i class="bi bi-arrow-left me-1"></i>Reports</a>
+  {% for sid, slabel in [('detailed','OP Service Detailed'),('overview','OP Service Overview'),
+     ('share','OP Service Share'),('consultation_wise','Consultation Wise'),('audit','Audit Log')] %}
+  <a href="{{ url_for('reports.op_service', sub=sid, date_from=date_from, date_to=date_to) }}"
+     class="mc-subnav-item {% if sub==sid %}active{% endif %}">{{ slabel }}</a>
+  {% endfor %}
+</div>
+{% endblock %}
+
+{% block content %}
+{% set report_type = 'op_service' %}
+<div class="mc-page-header">
+  <h1 class="mc-page-title"><i class="bi bi-person-check"></i> OP Service Report — {{ sub|replace('_',' ')|title }}</h1>
+</div>
+{% include 'reports/_report_header.html' %}
+
+<div class="mc-card">
+  <div class="mc-card-header"><i class="bi bi-table"></i> {{ sub|replace('_',' ')|title }}
+    <span class="badge bg-primary ms-2">{{ data|length }} records</span>
+  </div>
+  <div class="mc-card-body p-0">
+    <div class="mc-table-wrap">
+      {% if sub == 'detailed' %}
+      <table class="mc-table mc-datatable">
+        <thead><tr><th>Date</th><th>Token</th><th>Patient</th><th>UHID</th><th>Age/Sex</th><th>Doctor</th><th>Dept</th><th>Visit Type</th><th>Status</th></tr></thead>
+        <tbody>
+          {% for appt, patient, doctor in data %}
+          <tr>
+            <td class="small">{{ appt.appointment_date.strftime('%d-%m-%Y') }}</td>
+            <td><div class="mc-token">{{ appt.token_number or '—' }}</div></td>
+            <td class="fw-semibold">{{ patient.full_name }}</td>
+            <td><span class="mc-uhid">{{ patient.uhid }}</span></td>
+            <td class="small">{{ patient.age_years or '' }}{% if patient.age_years %}/{% endif %}{{ patient.gender[0] if patient.gender else '' }}</td>
+            <td class="small">{{ doctor.full_name }}</td>
+            <td class="small text-muted">{{ doctor.specialisation or '—' }}</td>
+            <td><span class="mc-badge mc-badge-{% if appt.visit_type=='new' %}new{% else %}old{% endif %}">{{ appt.visit_type|title }}</span></td>
+            <td><span class="mc-badge mc-badge-{% if appt.status=='completed' %}done{% elif appt.status=='cancelled' %}cancelled{% else %}booked{% endif %}">{{ appt.status|replace('_',' ')|title }}</span></td>
+          </tr>
+          {% else %}
+          <tr><td colspan="9" class="text-center text-muted py-4">No data for selected period.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+      {% elif sub == 'overview' %}
+      <table class="mc-table mc-datatable">
+        <thead><tr><th>Date</th><th>Total</th><th>Completed</th><th>Cancelled</th><th>New Patients</th></tr></thead>
+        <tbody>
+          {% for row in data %}
+          <tr>
+            <td>{{ row.appointment_date.strftime('%d-%m-%Y') }}</td>
+            <td class="fw-bold">{{ row.total }}</td>
+            <td><span class="mc-badge mc-badge-done">{{ row.completed }}</span></td>
+            <td><span class="mc-badge mc-badge-cancelled">{{ row.cancelled }}</span></td>
+            <td><span class="mc-badge mc-badge-new">{{ row.new_pts }}</span></td>
+          </tr>
+          {% else %}
+          <tr><td colspan="5" class="text-center text-muted py-4">No data.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+      {% elif sub == 'consultation_wise' %}
+      <table class="mc-table mc-datatable">
+        <thead><tr><th>Doctor</th><th>Specialisation</th><th>Total Appointments</th><th>Completed</th></tr></thead>
+        <tbody>
+          {% for row in data %}
+          <tr>
+            <td class="fw-semibold">{{ row.full_name }}</td>
+            <td class="small text-muted">{{ row.specialisation or '—' }}</td>
+            <td>{{ row.total }}</td>
+            <td><span class="mc-badge mc-badge-done">{{ row.done }}</span></td>
+          </tr>
+          {% else %}
+          <tr><td colspan="4" class="text-center text-muted py-4">No data.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+      {% elif sub == 'audit' %}
+      <table class="mc-table mc-datatable">
+        <thead><tr><th>Time</th><th>User</th><th>Action</th><th>Module</th><th>Record</th><th>IP</th></tr></thead>
+        <tbody>
+          {% for log in data %}
+          <tr>
+            <td class="small">{{ log.timestamp.strftime('%d-%m-%Y %H:%M') }}</td>
+            <td class="small">{{ log.user.username if log.user else '—' }}</td>
+            <td><span class="mc-badge mc-badge-new">{{ log.action }}</span></td>
+            <td class="small text-muted">{{ log.module }}</td>
+            <td class="small">{{ log.record_type }} #{{ log.record_id }}</td>
+            <td class="small text-muted">{{ log.ip_address or '—' }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="6" class="text-center text-muted py-4">No audit logs.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+      {% else %}
+      <div class="p-4 text-center text-muted">Report sub-type "{{ sub }}" coming soon.</div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

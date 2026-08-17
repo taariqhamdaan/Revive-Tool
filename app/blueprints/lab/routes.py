@@ -1,516 +1,423 @@
-# Rivive SCH - app/blueprints/lab/routes.py  v4.2
-# 6 stages + Settings (test master CRUD with reference ranges)
+# MediCore - app/blueprints/lab/routes.py
+# Laboratory: test master, panels, lab orders, sample collection,
+# result entry, result verification, report generation.
+# Logic summary per tab:
+#   tests      — test master CRUD + bulk upload
+#   orders     — lab orders list, filter by status/date
+#   results    — result entry per order item
+#   pending    — sample collected but awaiting results
+#   critical   — critical values flagged
+#   reports    — generated reports viewer
 
-from datetime import datetime, timezone, date
-from decimal import Decimal
+from datetime import date, datetime, timezone
 from flask import (Blueprint, render_template, redirect, url_for,
-                   request, flash, jsonify)
+                   request, flash, jsonify, send_file, current_app)
 from flask_login import login_required, current_user
-from sqlalchemy import func, or_
 from app.extensions import db
-from app.models.lab import (TestMaster, LabCategory, LabOrder, LabOrderItem,
-                             SampleCollection, LabResult, LabApproval)
+from app.models.lab import (TestMaster, TestCategory, TestPanel, TestPanelItem,
+                             LabOrder, LabOrderItem, LabResult)
+from app.models.patients import Patient
+from app.models.opd import Doctor
+from app.models.foundation import Branch
+from app.utils.decorators import require_permission
+from app.utils.audit import log_action
+from app.utils.bulk_upload import process_bulk_upload, generate_upload_template
+import os
+from werkzeug.utils import secure_filename
 
 lab_bp = Blueprint("lab", __name__)
 
-# ── helpers ──────────────────────────────────────────────────────────
-
-def _bid():
-    return current_user.branch_id
-
-def _order_no(branch_id):
-    seq = LabOrder.query.filter_by(branch_id=branch_id).count() + 1
-    return f"LAB/{date.today().strftime('%y%m')}/{seq:04d}"
-
-def _bill_no(branch_id):
-    from app.models.foundation import Bill
-    seq = Bill.query.filter_by(branch_id=branch_id).count() + 1
-    return f"LB/{date.today().strftime('%y')}/{seq:04d}"
-
-def _phlebotomists(branch_id):
-    from app.models.foundation import User, Role
-    role = Role.query.filter(Role.name.ilike("%phlebotomist%")).first()
-    if role:
-        return User.query.filter_by(role_id=role.id, branch_id=branch_id,
-                                    is_active=True).all()
-    return User.query.filter_by(branch_id=branch_id, is_active=True).limit(30).all()
-
-# ── MAIN TABBED INDEX ─────────────────────────────────────────────────
 
 @lab_bp.route("/")
 @login_required
+@require_permission("lab", "view")
 def index():
-    tab = request.args.get("tab", "registration")
-    bid = _bid()
-    today = date.today()
-    page  = request.args.get("page", 1, type=int)
+    tab       = request.args.get("tab", "orders")
+    branch_id = current_user.branch_id
+    page      = request.args.get("page", 1, type=int)
+    search    = request.args.get("q", "").strip()
+    today     = date.today()
 
-    if tab == "registration":
-        q   = request.args.get("q","").strip()
-        qry = LabOrder.query.filter(
-            LabOrder.branch_id == bid,
-            LabOrder.is_deleted == False,
-            func.date(LabOrder.ordered_at) == today,
-        )
-        if q:
-            from app.models.foundation import Patient
-            pids = [p.id for p in Patient.query.filter(
-                or_(Patient.full_name.ilike(f"%{q}%"),
-                    Patient.uhid.ilike(f"%{q}%"))).all()]
-            qry = qry.filter(LabOrder.patient_id.in_(pids))
-        orders = qry.order_by(LabOrder.ordered_at.desc()).paginate(page=page, per_page=30)
-        return render_template("lab/index.html", tab=tab, orders=orders,
-                               search=q, today=today)
-
-    elif tab == "collection":
-        orders = LabOrder.query.filter_by(branch_id=bid, status="ordered",
-                                          is_deleted=False)\
-                               .order_by(LabOrder.priority.desc(),
-                                         LabOrder.ordered_at).all()
-        phlebotomists = _phlebotomists(bid)
-        return render_template("lab/index.html", tab=tab, orders=orders,
-                               phlebotomists=phlebotomists, today=today)
-
+    if tab == "tests":
+        return _tests_view(branch_id, search, page)
     elif tab == "results":
-        orders = LabOrder.query.filter_by(branch_id=bid, status="sample_collected",
-                                          is_deleted=False)\
-                               .order_by(LabOrder.ordered_at)\
-                               .paginate(page=page, per_page=25)
-        return render_template("lab/index.html", tab=tab, orders=orders, today=today)
-
-    elif tab == "approval":
-        orders = LabOrder.query.filter_by(branch_id=bid, status="resulted",
-                                          is_deleted=False)\
-                               .order_by(LabOrder.ordered_at)\
-                               .paginate(page=page, per_page=25)
-        return render_template("lab/index.html", tab=tab, orders=orders, today=today)
-
+        return _results_view(branch_id, page)
     elif tab == "pending":
-        orders = LabOrder.query.filter(
-            LabOrder.branch_id == bid,
-            LabOrder.status.in_(["ordered","sample_collected","resulted"]),
-            LabOrder.is_deleted == False,
-        ).order_by(LabOrder.priority.desc(), LabOrder.ordered_at)\
-         .paginate(page=page, per_page=30)
-        return render_template("lab/index.html", tab=tab, orders=orders, today=today)
+        return _pending_view(branch_id)
+    elif tab == "critical":
+        return _critical_view(branch_id)
 
-    elif tab == "approved":
-        d_from = request.args.get("date_from", today.isoformat())
-        d_to   = request.args.get("date_to",   today.isoformat())
+    # Default: orders
+    q = LabOrder.query.filter(LabOrder.is_deleted == False)
+    if branch_id:
+        q = q.filter(LabOrder.branch_id == branch_id)
+    if search:
+        like = f"%{search}%"
+        q = q.join(Patient).filter(
+            db.or_(Patient.first_name.ilike(like), Patient.uhid.ilike(like),
+                   LabOrder.order_number.ilike(like))
+        )
+    date_filter = request.args.get("date_filter", today.isoformat())
+    if date_filter:
         try:
-            df = datetime.strptime(d_from, "%Y-%m-%d").date()
-            dt = datetime.strptime(d_to,   "%Y-%m-%d").date()
+            d = datetime.strptime(date_filter, "%Y-%m-%d").date()
+            q = q.filter(db.func.date(LabOrder.ordered_at) == d)
         except ValueError:
-            df = dt = today
-        orders = LabOrder.query.filter(
-            LabOrder.branch_id == bid,
-            LabOrder.status == "approved",
-            LabOrder.is_deleted == False,
-            func.date(LabOrder.ordered_at).between(df, dt),
-        ).order_by(LabOrder.ordered_at.desc()).paginate(page=page, per_page=30)
-        return render_template("lab/index.html", tab=tab, orders=orders,
-                               d_from=d_from, d_to=d_to, today=today)
+            pass
 
-    elif tab == "settings":
-        subtab = request.args.get("subtab","tests")
-        q      = request.args.get("q","").strip()
-        if subtab == "categories":
-            cats = LabCategory.query.filter_by(branch_id=bid).all()
-            return render_template("lab/index.html", tab=tab, subtab=subtab,
-                                   categories=cats, today=today)
-        else:
-            qry = TestMaster.query.filter_by(branch_id=bid, is_deleted=False)
-            if q:
-                qry = qry.filter(or_(TestMaster.test_name.ilike(f"%{q}%"),
-                                     TestMaster.test_code.ilike(f"%{q}%")))
-            tests = qry.order_by(TestMaster.test_name).paginate(page=page, per_page=25)
-            cats  = LabCategory.query.filter_by(branch_id=bid, is_active=True).all()
-            return render_template("lab/index.html", tab=tab, subtab=subtab,
-                                   tests=tests, categories=cats, search=q, today=today)
+    orders = q.order_by(LabOrder.ordered_at.desc()).paginate(page=page, per_page=25)
+    tests  = TestMaster.query.filter_by(branch_id=branch_id, is_deleted=False, is_active=True).all()
+    panels = TestPanel.query.filter_by(branch_id=branch_id, is_deleted=False, is_active=True).all()
+    doctors = Doctor.query.filter_by(branch_id=branch_id, is_active=True, is_deleted=False).all()
 
-    return redirect(url_for("lab.index", tab="registration"))
+    return render_template("lab/index.html", tab=tab, orders=orders,
+                           tests=tests, panels=panels, doctors=doctors,
+                           search=search, date_filter=date_filter, today=today)
 
-# ── STAGE 1: REGISTER ORDER ───────────────────────────────────────────
 
-@lab_bp.route("/register", methods=["GET","POST"])
+def _tests_view(branch_id, search, page):
+    q = TestMaster.query.filter(TestMaster.is_deleted == False)
+    if branch_id:
+        q = q.filter(TestMaster.branch_id == branch_id)
+    if search:
+        like = f"%{search}%"
+        q = q.filter(db.or_(TestMaster.name.ilike(like), TestMaster.test_code.ilike(like)))
+    tests = q.order_by(TestMaster.name).paginate(page=page, per_page=25)
+    categories = TestCategory.query.filter_by(branch_id=branch_id, is_deleted=False).all()
+    return render_template("lab/index.html", tab="tests", tests=tests,
+                           categories=categories, search=search)
+
+
+def _results_view(branch_id, page):
+    q = LabOrder.query.filter(
+        LabOrder.status.in_(["sample_collected", "processing"]),
+        LabOrder.is_deleted == False,
+    )
+    if branch_id:
+        q = q.filter(LabOrder.branch_id == branch_id)
+    orders = q.order_by(LabOrder.ordered_at).paginate(page=page, per_page=25)
+    return render_template("lab/index.html", tab="results", orders=orders)
+
+
+def _pending_view(branch_id):
+    q = LabOrder.query.filter(
+        LabOrder.status == "ordered",
+        LabOrder.is_deleted == False,
+    )
+    if branch_id:
+        q = q.filter(LabOrder.branch_id == branch_id)
+    orders = q.order_by(LabOrder.ordered_at).all()
+    return render_template("lab/index.html", tab="pending", orders=orders)
+
+
+def _critical_view(branch_id):
+    q = LabResult.query.filter(
+        LabResult.is_critical == True,
+        LabResult.is_deleted == False,
+    )
+    results = q.order_by(LabResult.resulted_at.desc()).limit(100).all()
+    return render_template("lab/index.html", tab="critical", results=results)
+
+
+# ── Create Lab Order ──────────────────────────────────────────────────────
+
+@lab_bp.route("/order/save", methods=["POST"])
 @login_required
-def register_order():
-    bid = _bid()
-    if request.method == "POST":
-        try:
-            from app.models.foundation import Bill
-            f          = request.form
-            patient_id = int(f.get("patient_id"))
-            doctor_id  = f.get("doctor_id") or None
-            priority   = f.get("priority","routine")
-            visit_type = f.get("visit_type","op")
-            clinical   = f.get("clinical_info","").strip()
+@require_permission("lab", "create")
+def order_save():
+    branch_id  = current_user.branch_id
+    branch     = Branch.query.get(branch_id) if branch_id else None
+    patient_id = int(request.form.get("patient_id"))
+    doctor_id  = request.form.get("doctor_id") or None
+    priority   = request.form.get("priority", "routine")
+    clinical   = request.form.get("clinical_info", "").strip()
 
-            order = LabOrder(
-                branch_id=bid, patient_id=patient_id,
-                doctor_id=int(doctor_id) if doctor_id else None,
-                ordered_by=current_user.id,
-                order_number=_order_no(bid),
-                priority=priority, visit_type=visit_type,
-                clinical_info=clinical, status="ordered",
+    try:
+        from app.utils.generators import generate_order_number
+        order_num = f"{branch.code if branch else 'GEN'}-LAB-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+
+        order = LabOrder(
+            branch_id=branch_id,
+            patient_id=patient_id,
+            doctor_id=int(doctor_id) if doctor_id else None,
+            order_number=order_num,
+            priority=priority,
+            clinical_info=clinical,
+            status="ordered",
+        )
+        db.session.add(order)
+        db.session.flush()
+
+        test_ids  = request.form.getlist("test_id[]")
+        panel_ids = request.form.getlist("panel_id[]")
+        total     = 0
+
+        for tid in test_ids:
+            if not tid: continue
+            test = TestMaster.query.get(int(tid))
+            if not test: continue
+            item = LabOrderItem(
+                order_id=order.id, test_id=int(tid),
+                status="ordered", price=float(test.price or 0),
             )
-            db.session.add(order)
-            db.session.flush()
+            db.session.add(item)
+            total += float(test.price or 0)
 
-            test_ids     = f.getlist("test_id[]")
-            total_amount = Decimal("0")
-
-            for tid in test_ids:
-                if not tid: continue
-                test = TestMaster.query.get(int(tid))
-                if not test: continue
-                gst_a = (test.price or Decimal("0")) * \
-                        (test.gst_percent or Decimal("0")) / 100
-                total = (test.price or Decimal("0")) + gst_a
-                item  = LabOrderItem(
-                    order_id=order.id, test_id=test.id, branch_id=bid,
-                    test_name=test.test_name,
-                    test_code=test.test_code or "",
-                    sample_type=test.sample_type or "",
-                    price=test.price or 0,
-                    gst_percent=test.gst_percent or 0,
-                    gst_amount=gst_a, total=total, status="pending",
+        for pid in panel_ids:
+            if not pid: continue
+            panel = TestPanel.query.get(int(pid))
+            if not panel: continue
+            for pitem in panel.tests.all():
+                item = LabOrderItem(
+                    order_id=order.id, test_id=pitem.test_id,
+                    panel_id=int(pid), status="ordered",
+                    price=float(panel.price or 0) / max(1, panel.tests.count()),
                 )
                 db.session.add(item)
-                total_amount += total
+            total += float(panel.price or 0)
 
-            order.total_amount = total_amount
-
-            # Create Bill (module_type='lab')
-            payment_mode = f.get("payment_mode","cash")
-            paid_now     = Decimal(f.get("paid_amount","0") or "0")
-            bill_status  = ("paid" if paid_now >= total_amount
-                            else ("partial" if paid_now > 0 else "credit"))
-            bill = Bill(
-                branch_id=bid, patient_id=patient_id,
-                doctor_id=int(doctor_id) if doctor_id else None,
-                created_by=current_user.id,
-                bill_number=_bill_no(bid),
-                module_type="lab", bill_type="regular",
-                billed_from="lab",
-                subtotal=total_amount,
-                gross_total=total_amount,
-                payable_amount=total_amount,
-                paid_amount=paid_now,
-                balance_amount=total_amount - paid_now,
-                received_amount=paid_now,
-                payment_mode=payment_mode,
-                status=bill_status,
-            )
-            db.session.add(bill)
-            db.session.flush()
-
-            order.bill_id        = bill.id
-            order.payment_status = bill_status
-
-            db.session.commit()
-            flash(f"Order {order.order_number} registered. Bill {bill.bill_number}.", "success")
-            return redirect(url_for("lab.index", tab="collection"))
-
-        except Exception as e:
-            db.session.rollback()
-            flash(f"Registration failed: {e}", "danger")
-
-    # GET
-    tests      = TestMaster.query.filter_by(branch_id=bid, is_active=True,
-                                             is_deleted=False).all()
-    from app.models.foundation import Doctor
-    doctors    = Doctor.query.filter_by(branch_id=bid, is_active=True,
-                                        is_deleted=False).all()
-    categories = LabCategory.query.filter_by(branch_id=bid, is_active=True).all()
-    return render_template("lab/register.html",
-        tests=tests, doctors=doctors, categories=categories, today=date.today())
-
-# ── STAGE 2: SAMPLE COLLECTION ────────────────────────────────────────
-
-@lab_bp.route("/collect/<int:order_id>", methods=["POST"])
-@login_required
-def collect_sample(order_id):
-    order = LabOrder.query.get_or_404(order_id)
-    try:
-        f               = request.form
-        phlebot_id      = f.get("phlebotomist_id") or None
-        is_fasting      = f.get("is_fasting") == "1"
-        sample_id       = f.get("sample_id","").strip()
-        notes           = f.get("collection_notes","").strip()
-
-        sc = order.sample or SampleCollection(order_id=order.id, branch_id=order.branch_id)
-        if not order.sample:
-            db.session.add(sc)
-
-        sc.phlebotomist_id  = int(phlebot_id) if phlebot_id else None
-        sc.collected_at     = datetime.now(timezone.utc)   # timestamp set HERE
-        sc.sample_id        = sample_id
-        sc.is_fasting       = is_fasting
-        sc.collection_notes = notes
-
-        order.status = "sample_collected"
-        LabOrderItem.query.filter_by(order_id=order.id)\
-                          .update({"status":"collected"})
+        order.total_amount = total
         db.session.commit()
-        flash(f"Sample collected for {order.order_number}.", "success")
+        log_action("CREATE", "lab", record_id=order.id, record_type="LabOrder",
+                   new_value={"order_number": order_num, "patient_id": patient_id})
+        flash(f"Lab order {order_num} created.", "success")
     except Exception as e:
         db.session.rollback()
-        flash(f"Collection failed: {e}", "danger")
-    return redirect(url_for("lab.index", tab="collection"))
+        flash(f"Error: {e}", "danger")
 
-# ── STAGE 3: RESULT ENTRY ────────────────────────────────────────────
+    return redirect(url_for("lab.index", tab="orders"))
 
-@lab_bp.route("/results/<int:order_id>", methods=["GET","POST"])
+
+# ── Sample Collection ─────────────────────────────────────────────────────
+
+@lab_bp.route("/order/<int:order_id>/collect", methods=["POST"])
 @login_required
+@require_permission("lab", "edit")
+def collect_sample(order_id):
+    order = LabOrder.query.get_or_404(order_id)
+    order.status = "sample_collected"
+    LabOrderItem.query.filter_by(order_id=order_id, status="ordered").update(
+        {"status": "sample_collected", "collected_at": datetime.now(timezone.utc),
+         "collected_by": current_user.id}
+    )
+    db.session.commit()
+    log_action("UPDATE", "lab", record_id=order_id, record_type="LabOrder",
+               new_value={"status": "sample_collected"})
+    flash("Sample collected.", "success")
+    return redirect(url_for("lab.index", tab="pending"))
+
+
+# ── Result Entry ──────────────────────────────────────────────────────────
+
+@lab_bp.route("/order/<int:order_id>/results", methods=["GET", "POST"])
+@login_required
+@require_permission("lab", "edit")
 def enter_results(order_id):
     order = LabOrder.query.get_or_404(order_id)
-    locked = (order.status == "approved" and order.approval
-              and not order.approval.is_unlocked)
+    items = order.items.filter_by(is_deleted=False).all()
+    patient = Patient.query.get(order.patient_id)
 
-    if request.method == "POST" and not locked:
+    if request.method == "POST":
         try:
-            items = order.items.filter_by(is_deleted=False).all()
-            any_saved = False
             for item in items:
-                val = request.form.get(f"result_{item.id}","").strip()
-                rem = request.form.get(f"remarks_{item.id}","").strip()
+                val     = request.form.get(f"result_{item.id}", "").strip()
+                remarks = request.form.get(f"remarks_{item.id}", "").strip()
                 if not val:
                     continue
 
-                if item.result:
-                    if item.result.is_locked:
-                        continue
-                    res = item.result
+                test = TestMaster.query.get(item.test_id)
+                is_critical = False
+                is_abnormal = False
+                flag        = ""
+
+                # Check critical values
+                try:
+                    num_val = float(val)
+                    if test and test.critical_low and num_val < float(test.critical_low):
+                        is_critical = True; is_abnormal = True; flag = "LL"
+                    elif test and test.critical_high and num_val > float(test.critical_high):
+                        is_critical = True; is_abnormal = True; flag = "HH"
+                except (ValueError, TypeError):
+                    pass
+
+                existing = LabResult.query.filter_by(
+                    order_item_id=item.id, is_deleted=False).first()
+
+                if existing:
+                    existing.result_value = val
+                    existing.remarks      = remarks
+                    existing.is_critical  = is_critical
+                    existing.is_abnormal  = is_abnormal
+                    existing.abnormal_flag = flag
+                    existing.resulted_at  = datetime.now(timezone.utc)
+                    existing.resulted_by  = current_user.id
                 else:
-                    res = LabResult(order_item_id=item.id, order_id=order.id,
-                                    branch_id=order.branch_id,
-                                    entered_by=current_user.id)
-                    db.session.add(res)
-
-                res.result_value    = val
-                res.result_unit     = item.test.unit if item.test else ""
-                res.reference_range = item.test.normal_range if item.test else ""
-                res.remarks         = rem
-                res.entered_by      = current_user.id
-                res.resulted_at     = datetime.now(timezone.utc)
-                if item.test:
-                    res.compute_flags(item.test)
-
+                    result = LabResult(
+                        order_item_id=item.id,
+                        order_id=order.id,
+                        patient_id=order.patient_id,
+                        test_id=item.test_id,
+                        result_value=val,
+                        result_unit=test.unit if test else "",
+                        reference_range=test.normal_range if test else "",
+                        is_critical=is_critical,
+                        is_abnormal=is_abnormal,
+                        abnormal_flag=flag,
+                        remarks=remarks,
+                        resulted_by=current_user.id,
+                    )
+                    db.session.add(result)
                 item.status = "resulted"
-                any_saved   = True
 
-            if any_saved:
-                all_done = all(i.status in ("resulted","approved")
-                               for i in order.items.filter_by(is_deleted=False).all())
-                if all_done:
-                    order.status = "resulted"
-
+            order.status = "resulted"
             db.session.commit()
-            flash("Results saved.", "success")
-            return redirect(url_for("lab.index", tab="approval"))
+
+            # Send email if configured
+            if patient and patient.email:
+                try:
+                    from app.utils.email import send_lab_report_ready
+                    branch = Branch.query.get(order.branch_id)
+                    send_lab_report_ready(patient, order, branch)
+                except Exception:
+                    pass
+
+            log_action("UPDATE", "lab", record_id=order.id, record_type="LabOrder",
+                       new_value={"status": "resulted"})
+            flash("Results saved successfully.", "success")
+            return redirect(url_for("lab.index", tab="results"))
 
         except Exception as e:
             db.session.rollback()
             flash(f"Save failed: {e}", "danger")
 
-    items = order.items.filter_by(is_deleted=False).all()
     return render_template("lab/enter_results.html",
-        order=order, items=items, patient=order.patient,
-        locked=locked, today=date.today())
+                           order=order, items=items, patient=patient)
 
-# ── STAGE 4: APPROVE ─────────────────────────────────────────────────
 
-@lab_bp.route("/approve/<int:order_id>", methods=["POST"])
+# ── Verify Results ────────────────────────────────────────────────────────
+
+@lab_bp.route("/order/<int:order_id>/verify", methods=["POST"])
 @login_required
-def approve_report(order_id):
+@require_permission("lab", "verify")
+def verify_results(order_id):
     order = LabOrder.query.get_or_404(order_id)
-    try:
-        if order.approval:
-            flash("Already approved.", "info")
-            return redirect(url_for("lab.view_report", order_id=order_id))
-
-        apv = LabApproval(
-            order_id=order.id, branch_id=order.branch_id,
-            approved_by=current_user.id,
-            approver_note=request.form.get("approver_note","").strip(),
-        )
-        db.session.add(apv)
-
-        for item in order.items.filter_by(is_deleted=False).all():
-            if item.result:
-                item.result.is_locked = True
-            item.status = "approved"
-
-        order.status = "approved"
-        db.session.commit()
-        flash(f"Report {order.order_number} approved and locked.", "success")
-    except Exception as e:
-        db.session.rollback()
-        flash(f"Approval failed: {e}", "danger")
-    return redirect(url_for("lab.index", tab="approved"))
-
-# ── UNLOCK (superadmin only) ──────────────────────────────────────────
-
-@lab_bp.route("/unlock/<int:order_id>", methods=["POST"])
-@login_required
-def unlock_report(order_id):
-    if not current_user.is_superadmin:
-        flash("Only superadmin can unlock reports.", "danger")
-        return redirect(url_for("lab.view_report", order_id=order_id))
-    order = LabOrder.query.get_or_404(order_id)
-    if not order.approval:
-        flash("No approval record.", "warning")
-        return redirect(url_for("lab.view_report", order_id=order_id))
-    order.approval.is_unlocked   = True
-    order.approval.unlocked_by   = current_user.id
-    order.approval.unlocked_at   = datetime.now(timezone.utc)
-    order.approval.unlock_reason = request.form.get("unlock_reason","").strip()
-    for item in order.items.filter_by(is_deleted=False).all():
-        if item.result:
-            item.result.is_locked = False
-    order.status = "resulted"
+    LabResult.query.filter_by(order_id=order_id, is_deleted=False).update({
+        "verified_by": current_user.id,
+        "verified_at": datetime.now(timezone.utc),
+    })
+    order.status = "reported"
     db.session.commit()
-    flash(f"Report {order.order_number} unlocked.", "warning")
-    return redirect(url_for("lab.enter_results", order_id=order_id))
+    log_action("UPDATE", "lab", record_id=order_id, record_type="LabOrder",
+               new_value={"status": "reported"})
+    flash("Results verified and report ready.", "success")
+    return redirect(url_for("lab.view_report", order_id=order_id))
 
-# ── VIEW / PRINT REPORT ───────────────────────────────────────────────
 
-@lab_bp.route("/report/<int:order_id>")
+# ── View Report ───────────────────────────────────────────────────────────
+
+@lab_bp.route("/order/<int:order_id>/report")
 @login_required
+@require_permission("lab", "view")
 def view_report(order_id):
-    order    = LabOrder.query.get_or_404(order_id)
-    items    = order.items.filter_by(is_deleted=False).all()
-    from app.models.foundation import Branch
-    branch   = Branch.query.get(order.branch_id)
+    order   = LabOrder.query.get_or_404(order_id)
+    items   = order.items.filter_by(is_deleted=False).all()
+    results = {r.order_item_id: r for r in
+               LabResult.query.filter_by(order_id=order_id, is_deleted=False).all()}
+    patient = Patient.query.get(order.patient_id)
+    doctor  = Doctor.query.get(order.doctor_id) if order.doctor_id else None
+    branch  = Branch.query.get(order.branch_id) if order.branch_id else None
     return render_template("lab/report.html",
-        order=order, items=items,
-        patient=order.patient, doctor=order.doctor,
-        sample=order.sample, approval=order.approval,
-        branch=branch, now=datetime.now(timezone.utc))
+                           order=order, items=items, results=results,
+                           patient=patient, doctor=doctor, branch=branch)
 
-# ── SETTINGS: TEST MASTER ─────────────────────────────────────────────
 
-@lab_bp.route("/settings/test/save", methods=["POST"])
+# ── Test CRUD ─────────────────────────────────────────────────────────────
+
+@lab_bp.route("/test/save", methods=["POST"])
 @login_required
+@require_permission("lab", "create")
 def test_save():
-    bid     = _bid()
-    test_id = request.form.get("test_id")
-    try:
-        f = request.form
-        def _dec(k):
-            v = f.get(k,"").strip()
-            return Decimal(v) if v else None
+    branch_id = current_user.branch_id
+    test_id   = request.form.get("test_id")
 
-        if test_id:
-            test = TestMaster.query.get(int(test_id))
-        else:
-            test = TestMaster(branch_id=bid, created_by=current_user.id)
-            db.session.add(test)
+    if test_id:
+        t = TestMaster.query.get_or_404(int(test_id))
+    else:
+        t = TestMaster(branch_id=branch_id)
+        db.session.add(t)
 
-        test.test_code         = f.get("test_code","").strip().upper() or None
-        test.test_name         = f.get("test_name","").strip()
-        test.test_short_name   = f.get("test_short_name","").strip() or None
-        test.category_id       = int(f.get("category_id")) if f.get("category_id") else None
-        test.sample_type       = f.get("sample_type","").strip() or None
-        test.method            = f.get("method","").strip() or None
-        test.department        = f.get("department","").strip() or None
-        test.unit              = f.get("unit","").strip() or None
-        test.normal_range      = f.get("normal_range","").strip() or None
-        test.normal_range_text = f.get("normal_range_text","").strip() or None
-        test.male_range        = f.get("male_range","").strip() or None
-        test.female_range      = f.get("female_range","").strip() or None
-        test.normal_low        = _dec("normal_low")
-        test.normal_high       = _dec("normal_high")
-        test.critical_low      = _dec("critical_low")
-        test.critical_high     = _dec("critical_high")
-        test.price             = Decimal(f.get("price","0") or "0")
-        test.gst_percent       = Decimal(f.get("gst_percent","0") or "0")
-        test.turnaround_hrs    = int(f.get("turnaround_hrs","24") or "24")
-        test.print_note        = f.get("print_note","").strip() or None
+    t.test_code     = request.form.get("test_code", "").strip() or None
+    t.name          = request.form.get("name", "").strip()
+    t.category_id   = request.form.get("category_id") or None
+    t.sample_type   = request.form.get("sample_type", "").strip() or None
+    t.method        = request.form.get("method", "").strip() or None
+    t.unit          = request.form.get("unit", "").strip() or None
+    t.normal_range  = request.form.get("normal_range", "").strip() or None
+    t.male_range    = request.form.get("male_range", "").strip() or None
+    t.female_range  = request.form.get("female_range", "").strip() or None
+    t.critical_low  = request.form.get("critical_low") or None
+    t.critical_high = request.form.get("critical_high") or None
+    t.turnaround_hrs = int(request.form.get("turnaround_hrs", 24) or 24)
+    t.price         = float(request.form.get("price", 0) or 0)
+    t.is_active     = True
 
-        db.session.commit()
-        flash(f"Test '{test.test_name}' saved.", "success")
-    except Exception as e:
-        db.session.rollback()
-        flash(f"Save failed: {e}", "danger")
-    return redirect(url_for("lab.index", tab="settings"))
-
-@lab_bp.route("/settings/test/delete/<int:test_id>", methods=["POST"])
-@login_required
-def test_delete(test_id):
-    t = TestMaster.query.get_or_404(test_id)
-    t.is_deleted = True
     db.session.commit()
-    flash("Test removed.", "info")
-    return redirect(url_for("lab.index", tab="settings"))
+    log_action("CREATE" if not test_id else "UPDATE", "lab",
+               record_id=t.id, record_type="TestMaster")
+    flash(f"Test '{t.name}' saved.", "success")
+    return redirect(url_for("lab.index", tab="tests"))
 
-@lab_bp.route("/settings/category/save", methods=["POST"])
+
+# ── Bulk Upload ───────────────────────────────────────────────────────────
+
+@lab_bp.route("/bulk-upload", methods=["GET", "POST"])
 @login_required
-def category_save():
-    bid = _bid()
-    try:
-        cat = LabCategory(
-            branch_id=bid,
-            name=request.form.get("name","").strip(),
-            code=request.form.get("code","").strip().upper() or None,
-        )
-        db.session.add(cat)
-        db.session.commit()
-        flash(f"Category '{cat.name}' added.", "success")
-    except Exception as e:
-        db.session.rollback()
-        flash(f"Failed: {e}", "danger")
-    return redirect(url_for("lab.index", tab="settings", subtab="categories"))
+@require_permission("lab", "create")
+def bulk_upload():
+    if request.method == "POST":
+        file = request.files.get("file")
+        if not file or not file.filename:
+            flash("No file selected.", "danger")
+            return redirect(request.url)
+        ext = file.filename.rsplit(".", 1)[-1].lower()
+        fname = secure_filename(f"bulk_tests_{datetime.now().strftime('%Y%m%d%H%M%S')}.{ext}")
+        spath = os.path.join(current_app.config["UPLOAD_FOLDER"], fname)
+        file.save(spath)
+        result = process_bulk_upload(spath, "tests", current_user.branch_id, current_user.id)
+        os.remove(spath)
+        return render_template("lab/bulk_result.html", result=result)
+    return render_template("lab/bulk_upload.html")
 
-# ── AJAX ──────────────────────────────────────────────────────────────
+
+@lab_bp.route("/download-template")
+@login_required
+def download_template():
+    import io
+    data = generate_upload_template("tests")
+    return send_file(io.BytesIO(data),
+                     mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                     as_attachment=True, download_name="Test_Upload_Template.xlsx")
+
+
+# ── Test search JSON ──────────────────────────────────────────────────────
 
 @lab_bp.route("/test-search")
 @login_required
 def test_search():
-    bid = _bid()
-    q   = request.args.get("q","").strip()
-    if len(q) < 1:
-        return jsonify([])
-    tests = TestMaster.query.filter(
-        TestMaster.branch_id == bid,
-        TestMaster.is_active == True,
-        TestMaster.is_deleted == False,
-        or_(TestMaster.test_name.ilike(f"%{q}%"),
-            TestMaster.test_code.ilike(f"%{q}%"))
-    ).limit(20).all()
-    return jsonify([{
-        "id":      t.id,
-        "code":    t.test_code or "",
-        "name":    t.test_name,
-        "sample":  t.sample_type or "",
-        "unit":    t.unit or "",
-        "range":   t.normal_range or "",
-        "price":   float(t.price or 0),
-        "gst":     float(t.gst_percent or 0),
-        "tat_hrs": t.turnaround_hrs or 24,
-        "cat_id":  t.category_id or "",
-    } for t in tests])
-
-@lab_bp.route("/patient-search")
-@login_required
-def patient_search():
-    from app.models.foundation import Patient
-    bid = _bid()
-    q   = request.args.get("q","").strip()
+    q = request.args.get("q", "").strip()
     if len(q) < 2:
         return jsonify([])
-    pts = Patient.query.filter(
-        Patient.branch_id == bid,
-        Patient.is_deleted == False,
-        or_(Patient.first_name.ilike(f"%{q}%"),
-            Patient.last_name.ilike(f"%{q}%"),
-            Patient.uhid.ilike(f"%{q}%"),
-            Patient.phone.ilike(f"%{q}%"))
-    ).limit(15).all()
+    like = f"%{q}%"
+    tests = TestMaster.query.filter(
+        TestMaster.is_deleted == False, TestMaster.is_active == True,
+        db.or_(TestMaster.name.ilike(like), TestMaster.test_code.ilike(like)),
+        *([TestMaster.branch_id == current_user.branch_id] if current_user.branch_id else []),
+    ).limit(10).all()
     return jsonify([{
-        "id":     p.id, "name": p.full_name,
-        "uhid":   p.uhid, "phone": p.phone,
-        "age":    p.age_years or "",
-        "gender": p.gender[0] if p.gender else "",
-    } for p in pts])
+        "id": t.id, "name": t.name,
+        "code": t.test_code or "",
+        "sample": t.sample_type or "",
+        "price": float(t.price or 0),
+        "unit": t.unit or "",
+        "range": t.normal_range or "",
+    } for t in tests])

@@ -1,0 +1,198 @@
+{% extends "shared/base.html" %}
+{% block title %}HR{% endblock %}
+{% block subnav %}
+<div class="mc-subnav">
+  {% for tid, lbl in [('employees','Employees'),('attendance','Attendance'),('leave','Leave Management')] %}
+  <a href="{{ url_for('hr.index', tab=tid) }}" class="mc-subnav-item {% if tab==tid %}active{% endif %}">{{ lbl }}</a>
+  {% endfor %}
+  <div class="ms-auto d-flex gap-2 pe-2">
+    {% if tab == 'employees' %}
+    <a href="{{ url_for('hr.employee_new') }}" class="btn btn-primary btn-sm"><i class="bi bi-person-plus me-1"></i>Add Employee</a>
+    <a href="{{ url_for('hr.bulk_upload') }}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-upload me-1"></i>Bulk Upload</a>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+{% block content %}
+
+{% if tab == 'employees' %}
+<div class="mc-page-header">
+  <h1 class="mc-page-title"><i class="bi bi-people"></i> Employees</h1>
+</div>
+<div class="mc-card mb-3">
+  <div class="mc-card-body py-2">
+    <form method="GET" class="d-flex gap-2">
+      <input type="hidden" name="tab" value="employees">
+      <input type="text" name="q" class="form-control form-control-sm" placeholder="Search by name, code or phone…" value="{{ search or '' }}" style="max-width:300px">
+      <button type="submit" class="btn btn-primary btn-sm">Search</button>
+    </form>
+  </div>
+</div>
+<div class="mc-card">
+  <div class="mc-card-body p-0">
+    <div class="mc-table-wrap">
+      <table class="mc-table">
+        <thead><tr><th>Emp Code</th><th>Name</th><th>Department</th><th>Designation</th><th>Phone</th><th>Join Date</th><th>Type</th><th>Status</th><th>Action</th></tr></thead>
+        <tbody>
+          {% for e in employees.items %}
+          <tr>
+            <td><span class="mc-uhid">{{ e.employee_code }}</span></td>
+            <td class="fw-semibold">{{ e.full_name }}</td>
+            <td class="small">{{ e.department.name if e.department else '—' }}</td>
+            <td class="small text-muted">{{ e.designation.name if e.designation else '—' }}</td>
+            <td class="small">{{ e.phone }}</td>
+            <td class="small">{{ e.join_date.strftime('%d %b %Y') if e.join_date else '—' }}</td>
+            <td><span class="mc-badge mc-badge-new">{{ e.employment_type|title }}</span></td>
+            <td><span class="mc-badge {% if e.is_active %}mc-badge-active{% else %}mc-badge-inactive{% endif %}">{{ 'Active' if e.is_active else 'Inactive' }}</span></td>
+            <td>
+              <a href="{{ url_for('hr.employee_edit', emp_id=e.id) }}" class="btn btn-icon btn-outline-secondary" title="Edit"><i class="bi bi-pencil"></i></a>
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="9" class="text-center text-muted py-4">No employees found.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% if employees.pages > 1 %}
+  <div class="mc-pager">
+    <span>{{ employees.total }} employees</span>
+    <nav><ul class="pagination pagination-sm mb-0">
+      <li class="page-item {% if not employees.has_prev %}disabled{% endif %}"><a class="page-link" href="{{ url_for('hr.index', tab='employees', page=employees.prev_num, q=search) }}">‹</a></li>
+      {% for p in employees.iter_pages() %}{% if p %}<li class="page-item {% if p==employees.page %}active{% endif %}"><a class="page-link" href="{{ url_for('hr.index', tab='employees', page=p, q=search) }}">{{ p }}</a></li>{% endif %}{% endfor %}
+      <li class="page-item {% if not employees.has_next %}disabled{% endif %}"><a class="page-link" href="{{ url_for('hr.index', tab='employees', page=employees.next_num, q=search) }}">›</a></li>
+    </ul></nav>
+  </div>
+  {% endif %}
+</div>
+
+{% elif tab == 'attendance' %}
+<div class="mc-page-header">
+  <h1 class="mc-page-title"><i class="bi bi-calendar-check"></i> Attendance — {{ att_date }}</h1>
+</div>
+<div class="mc-card mb-3">
+  <div class="mc-card-body py-2">
+    <form method="GET" class="d-flex gap-2 align-items-center">
+      <input type="hidden" name="tab" value="attendance">
+      <label class="mc-label mb-0">Date</label>
+      <input type="date" name="att_date" class="form-control form-control-sm" value="{{ att_date }}" style="width:160px">
+      <button type="submit" class="btn btn-primary btn-sm">Load</button>
+    </form>
+  </div>
+</div>
+<form method="POST" action="{{ url_for('hr.attendance_save') }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input type="hidden" name="att_date" value="{{ att_date }}">
+  <div class="mc-card">
+    <div class="mc-card-body p-0">
+      <div class="mc-table-wrap">
+        <table class="mc-table">
+          <thead><tr><th>Employee</th><th>Code</th><th>Dept</th><th>Status</th><th>Check In</th><th>Check Out</th></tr></thead>
+          <tbody>
+            {% for emp in employees %}
+            {% set att = records | selectattr('employee_id','eq',emp.id) | first | default(none) %}
+            <input type="hidden" name="emp_id[]" value="{{ emp.id }}">
+            <tr>
+              <td class="fw-semibold">{{ emp.full_name }}</td>
+              <td><span class="mc-uhid">{{ emp.employee_code }}</span></td>
+              <td class="small text-muted">{{ emp.department.name if emp.department else '—' }}</td>
+              <td>
+                <select name="status[]" class="form-select form-select-sm" style="width:120px">
+                  {% for s in ['present','absent','half_day','late','on_leave','holiday','weekly_off'] %}
+                  <option value="{{ s }}" {% if att and att.status==s %}selected{% elif not att and s=='present' %}selected{% endif %}>{{ s|replace('_',' ')|title }}</option>
+                  {% endfor %}
+                </select>
+              </td>
+              <td><input type="time" name="check_in[]" class="form-control form-control-sm" value="{{ att.check_in.strftime('%H:%M') if att and att.check_in else '' }}" style="width:100px"></td>
+              <td><input type="time" name="check_out[]" class="form-control form-control-sm" value="{{ att.check_out.strftime('%H:%M') if att and att.check_out else '' }}" style="width:100px"></td>
+            </tr>
+            {% else %}
+            <tr><td colspan="6" class="text-center text-muted py-4">No active employees found.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {% if employees %}
+    <div class="mc-card-body border-top">
+      <button type="submit" class="btn btn-primary"><i class="bi bi-floppy me-1"></i>Save Attendance</button>
+    </div>
+    {% endif %}
+  </div>
+</form>
+
+{% elif tab == 'leave' %}
+<div class="mc-page-header">
+  <h1 class="mc-page-title"><i class="bi bi-calendar-x"></i> Leave Management</h1>
+  <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#applyLeaveModal">
+    <i class="bi bi-plus-circle me-1"></i>Apply Leave
+  </button>
+</div>
+<div class="mc-card">
+  <div class="mc-card-body p-0">
+    <div class="mc-table-wrap">
+      <table class="mc-table mc-datatable">
+        <thead><tr><th>Employee</th><th>Leave Type</th><th>From</th><th>To</th><th>Days</th><th>Reason</th><th>Status</th><th>Action</th></tr></thead>
+        <tbody>
+          {% for lr in leaves %}
+          <tr>
+            <td class="fw-semibold">{{ lr.employee.full_name if lr.employee else '—' }}</td>
+            <td class="small">{{ lr.leave_type.name if lr.leave_type else '—' }}</td>
+            <td class="small">{{ lr.from_date.strftime('%d %b %Y') }}</td>
+            <td class="small">{{ lr.to_date.strftime('%d %b %Y') }}</td>
+            <td>{{ lr.total_days }}</td>
+            <td class="small text-muted">{{ lr.reason or '—' }}</td>
+            <td>
+              <span class="mc-badge {% if lr.status=='approved' %}mc-badge-done{% elif lr.status=='rejected' %}mc-badge-cancelled{% else %}mc-badge-review{% endif %}">
+                {{ lr.status|title }}
+              </span>
+            </td>
+            <td>
+              {% if lr.status == 'pending' and current_user.has_permission('hr','edit') %}
+              <form method="POST" action="{{ url_for('hr.leave_approve', lr_id=lr.id) }}" class="d-inline">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button name="action" value="approve" class="btn btn-sm btn-outline-success" type="submit">Approve</button>
+                <button name="action" value="reject"  class="btn btn-sm btn-outline-danger"  type="submit">Reject</button>
+              </form>
+              {% endif %}
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="8" class="text-center text-muted py-4">No leave requests found.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Apply Leave Modal -->
+<div class="modal fade" id="applyLeaveModal" tabindex="-1">
+  <div class="modal-dialog"><div class="modal-content">
+    <div class="modal-header"><h5 class="modal-title">Apply Leave</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+    <form method="POST" action="{{ url_for('hr.leave_apply') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="modal-body">
+        <div class="row g-3">
+          <div class="col-12">
+            <label class="mc-label required">Leave Type</label>
+            <select name="leave_type_id" class="form-select" required>
+              <option value="">— Select —</option>
+              {% for lt in leave_types %}<option value="{{ lt.id }}">{{ lt.name }} ({{ lt.code }})</option>{% endfor %}
+            </select>
+          </div>
+          <div class="col-6"><label class="mc-label required">From Date</label><input type="date" name="from_date" class="form-control" required></div>
+          <div class="col-6"><label class="mc-label required">To Date</label><input type="date" name="to_date" class="form-control" required></div>
+          <div class="col-12"><label class="mc-label">Reason</label><textarea name="reason" class="form-control" rows="2" placeholder="Reason for leave..."></textarea></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="submit" class="btn btn-primary">Submit Leave</button>
+      </div>
+    </form>
+  </div></div>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,28 @@
+{% extends "shared/base.html" %}
+{% block title %}Bulk Upload Employees{% endblock %}
+{% block content %}
+<div class="mc-page-header">
+  <h1 class="mc-page-title"><i class="bi bi-upload"></i> Bulk Employee Upload</h1>
+  <a href="{{ url_for('hr.download_template') }}" class="btn btn-outline-success btn-sm"><i class="bi bi-download me-1"></i>Download Template</a>
+</div>
+<div class="row justify-content-center"><div class="col-md-6">
+<div class="mc-card">
+  <div class="mc-card-body">
+    <form method="POST" enctype="multipart/form-data" action="{{ url_for('hr.bulk_upload') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="mc-upload-zone">
+        <input type="file" name="file" accept=".xlsx,.xls,.csv" class="d-none" id="fileInput">
+        <i class="bi bi-cloud-upload"></i>
+        <p class="fw-semibold mb-1">Drop Excel / CSV file here</p>
+        <p class="text-muted small mb-2">or click to browse</p>
+        <div class="mc-upload-fname text-primary fw-semibold">No file selected</div>
+      </div>
+      <div class="d-flex gap-2 mt-3">
+        <button type="submit" class="btn btn-primary" data-upload-btn disabled><i class="bi bi-upload me-1"></i>Upload & Process</button>
+        <a href="{{ url_for('hr.index') }}" class="btn btn-outline-secondary">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+</div></div>
+{% endblock %}

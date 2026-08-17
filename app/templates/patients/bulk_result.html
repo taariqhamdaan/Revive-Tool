@@ -1,0 +1,77 @@
+{% extends "shared/base.html" %}
+{% block title %}Upload Result{% endblock %}
+
+{% block content %}
+<div class="mc-page-header">
+  <h1 class="mc-page-title"><i class="bi bi-clipboard-check me-2"></i>Upload Result</h1>
+  <a href="{{ url_for('patients.index') }}" class="btn btn-primary btn-sm">
+    <i class="bi bi-people me-1"></i>View All Patients
+  </a>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-md-4">
+    <div class="mc-stat-card">
+      <div class="mc-stat-icon green"><i class="bi bi-check-circle"></i></div>
+      <div>
+        <div class="mc-stat-value">{{ result.success_count }}</div>
+        <div class="mc-stat-label">Successfully Imported</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="mc-stat-card">
+      <div class="mc-stat-icon red"><i class="bi bi-x-circle"></i></div>
+      <div>
+        <div class="mc-stat-value">{{ result.error_count }}</div>
+        <div class="mc-stat-label">Rows with Errors</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="mc-stat-card">
+      <div class="mc-stat-icon blue"><i class="bi bi-file-earmark-check"></i></div>
+      <div>
+        <div class="mc-stat-value">{{ result.success_count + result.error_count }}</div>
+        <div class="mc-stat-label">Total Rows Processed</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% if result.errors %}
+<div class="mc-card">
+  <div class="mc-card-header text-danger"><i class="bi bi-exclamation-triangle"></i> Errors ({{ result.errors | length }})</div>
+  <div class="mc-card-body p-0">
+    <table class="mc-table">
+      <thead><tr><th>Row #</th><th>Error</th></tr></thead>
+      <tbody>
+        {% for err in result.errors %}
+        <tr>
+          <td><span class="badge bg-danger">Row {{ err.row }}</span></td>
+          <td class="text-danger small">{{ err.error }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+{% if result.success_count > 0 %}
+<div class="alert alert-success">
+  <i class="bi bi-check-circle me-2"></i>
+  <strong>{{ result.success_count }} patient(s)</strong> imported successfully.
+  <a href="{{ url_for('patients.index') }}" class="alert-link">View patients →</a>
+</div>
+{% endif %}
+
+<div class="d-flex gap-2 mt-3">
+  <a href="{{ url_for('patients.bulk_upload') }}" class="btn btn-outline-primary">
+    <i class="bi bi-upload me-1"></i>Upload Another File
+  </a>
+  <a href="{{ url_for('patients.index') }}" class="btn btn-primary">
+    <i class="bi bi-people me-1"></i>Go to Patients
+  </a>
+</div>
+{% endblock %}

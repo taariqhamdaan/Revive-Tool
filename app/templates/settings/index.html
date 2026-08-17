@@ -1,0 +1,44 @@
+{% extends "shared/base.html" %}
+{% block title %}Settings{% endblock %}
+
+{% block content %}
+<div class="mc-page-header">
+  <h1 class="mc-page-title"><i class="bi bi-gear me-2"></i>Settings & Administration</h1>
+</div>
+
+<div class="row g-3">
+  {% set panels = [
+    ('settings.branches',       'building',         'Branches',         'Manage clinic branches, addresses, branding',              'superadmin'),
+    ('settings.users',          'person-badge',     'Users',            'Create and manage user accounts and access',               'branch_admin'),
+    ('settings.roles',          'shield-lock',      'Roles & Permissions','Define roles and assign module-level permissions',       'branch_admin'),
+    ('settings.departments',    'diagram-3',        'Departments',      'Manage clinical and admin departments',                    'branch_admin'),
+    ('settings.system_settings','sliders',          'System Settings',  'Date format, currency, appointment slots, defaults',       'branch_admin'),
+    ('settings.email_templates','envelope-paper',   'Email Templates',  'Customise email content for all notification types',      'branch_admin'),
+    ('settings.audit_log',      'journal-text',     'Audit Log',        'View immutable record of all system actions (DISHA)',      'branch_admin'),
+  ] %}
+  {% for endpoint, icon, title, desc, access in panels %}
+  {% if current_user.is_superadmin or access == 'branch_admin' %}
+  <div class="col-md-4">
+    <a href="{{ url_for(endpoint) }}" class="text-decoration-none">
+      <div class="mc-card h-100 mc-settings-tile">
+        <div class="mc-card-body d-flex align-items-start gap-3">
+          <div class="mc-stat-icon blue flex-shrink-0" style="width:44px;height:44px;font-size:1.2rem">
+            <i class="bi bi-{{ icon }}"></i>
+          </div>
+          <div>
+            <div class="fw-semibold">{{ title }}</div>
+            <div class="text-muted small mt-1">{{ desc }}</div>
+          </div>
+        </div>
+      </div>
+    </a>
+  </div>
+  {% endif %}
+  {% endfor %}
+</div>
+
+<style>
+.mc-settings-tile { transition: box-shadow .15s, transform .15s; cursor: pointer; }
+.mc-settings-tile:hover { box-shadow: 0 4px 16px rgba(0,0,0,.1); transform: translateY(-2px); }
+</style>
+{% endblock %}

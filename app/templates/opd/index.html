@@ -1,0 +1,442 @@
+{% extends "shared/base.html" %}
+{% block title %}OPD{% endblock %}
+
+{% block subnav %}
+<div class="mc-subnav">
+  <a href="{{ url_for('opd.index', tab='op_list', date=filter_date.isoformat()) }}"
+     class="mc-subnav-item {% if tab=='op_list' %}active{% endif %}">
+    <i class="bi bi-person-circle me-1"></i>OP Patient
+  </a>
+  <a href="{{ url_for('opd.index', tab='ip_list', date=filter_date.isoformat()) }}"
+     class="mc-subnav-item {% if tab=='ip_list' %}active{% endif %}">
+    <i class="bi bi-hospital me-1"></i>IP Patient
+  </a>
+  <a href="{{ url_for('opd.index', tab='all', date=filter_date.isoformat()) }}"
+     class="mc-subnav-item {% if tab=='all' %}active{% endif %}">All</a>
+  <div class="ms-auto d-flex gap-2 align-items-center pe-2">
+    <span class="text-muted small">{{ filter_date.strftime('%d %b %Y') }}</span>
+    {% if current_user.has_permission('opd','create') %}
+    <a href="{{ url_for('opd.book') }}" class="btn btn-primary btn-sm">
+      <i class="bi bi-calendar-plus me-1"></i>Book
+    </a>
+    {% endif %}
+    <a href="{{ url_for('opd.doctors') }}" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-person-badge me-1"></i>Doctors
+    </a>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="mc-layout">
+
+  <!-- ═══ LEFT PANEL — Calendar + N/O/R Filters (PDF page 1 exact) ═══ -->
+  <div class="mc-left-panel" style="width:220px;flex-shrink:0">
+
+    <!-- Mini Calendar -->
+    <div class="p-2">
+      <!-- Month navigation -->
+      <div class="d-flex align-items-center justify-content-between mb-2 px-1">
+        <a href="{{ url_for('opd.index', tab=tab, cal_year=prev_year, cal_month=prev_month, date=filter_date.isoformat()) }}"
+           class="btn btn-icon btn-sm" style="width:24px;height:24px;font-size:.75rem;padding:0;border:none;color:#5b21b6">
+          <i class="bi bi-chevron-left"></i>
+        </a>
+        <span style="font-size:.78rem;font-weight:700;color:#3d1a78">
+          {{ month_name[:3] }} {{ cal_year }}
+        </span>
+        <a href="{{ url_for('opd.index', tab=tab, cal_year=next_year, cal_month=next_month, date=filter_date.isoformat()) }}"
+           class="btn btn-icon btn-sm" style="width:24px;height:24px;font-size:.75rem;padding:0;border:none;color:#5b21b6">
+          <i class="bi bi-chevron-right"></i>
+        </a>
+      </div>
+
+      <!-- Day-of-week headers -->
+      <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:1px;text-align:center;margin-bottom:2px">
+        {% for d in ['S','M','T','W','T','F','S'] %}
+        <div style="font-size:.6rem;font-weight:700;color:#6b7280;padding:2px 0">{{ d }}</div>
+        {% endfor %}
+      </div>
+
+      <!-- Calendar grid -->
+      <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:1px">
+        {% for week in cal_matrix %}
+        {% for day in week %}
+        {% if day == 0 %}
+        <div style="height:26px"></div>
+        {% else %}
+        {% set this_date = cal_year|string + '-' + '%02d'|format(cal_month) + '-' + '%02d'|format(day) %}
+        {% set this_date_obj = cal_year|string + '-' + '%02d'|format(cal_month) + '-' + '%02d'|format(day) %}
+        {% set count = day_counts.get(this_date|string, 0) if day_counts else 0 %}
+        {% set is_today = (day == today.day and cal_month == today.month and cal_year == today.year) %}
+        {% set is_selected = (day == filter_date.day and cal_month == filter_date.month and cal_year == filter_date.year) %}
+        {% set is_past = (cal_year < today.year) or (cal_year == today.year and cal_month < today.month) or (cal_year == today.year and cal_month == today.month and day < today.day) %}
+        <a href="{{ url_for('opd.index', tab=tab, cal_year=cal_year, cal_month=cal_month, date=this_date) }}"
+           style="display:flex;flex-direction:column;align-items:center;justify-content:center;
+                  height:26px;border-radius:4px;text-decoration:none;position:relative;
+                  background:{% if is_selected %}#3d1a78{% elif is_today %}#ede9fe{% else %}transparent{% endif %};
+                  color:{% if is_selected %}#fff{% elif is_today %}#3d1a78{% elif is_past %}#9ca3af{% else %}#374151{% endif %};
+                  font-size:.7rem;font-weight:{% if is_today or is_selected %}700{% else %}400{% endif %}">
+          {{ day }}
+          {% if count > 0 %}
+          <span style="position:absolute;bottom:1px;left:50%;transform:translateX(-50%);
+                       width:4px;height:4px;border-radius:50%;
+                       background:{% if is_selected %}rgba(255,255,255,.8){% else %}#7c3aed{% endif %}"></span>
+          {% endif %}
+        </a>
+        {% endif %}
+        {% endfor %}
+        {% endfor %}
+      </div>
+
+      <!-- Selected date count -->
+      <div class="mt-2 text-center" style="font-size:.72rem;color:#5b21b6;font-weight:600">
+        {{ filter_date.strftime('%d %b') }} —
+        {% set total_shown = rows|length %}
+        {{ total_shown }} patient{{ 's' if total_shown != 1 }}
+      </div>
+    </div>
+
+    <hr class="mc-divider mx-2">
+
+    <!-- N / O / R filter badges (PDF page 1 exact) -->
+    <div class="mc-left-panel-section">Patient Type</div>
+
+    <a href="{{ url_for('opd.index', tab=tab, date=filter_date.isoformat(), cal_year=cal_year, cal_month=cal_month) }}"
+       class="mc-left-panel-item {% if not visit_type_filter %}active{% endif %}">
+      <i class="bi bi-people"></i>
+      All Patients
+      <span class="mc-left-panel-count">{{ counts.op_list }}</span>
+    </a>
+
+    <a href="{{ url_for('opd.index', tab=tab, date=filter_date.isoformat(), visit_type='new', cal_year=cal_year, cal_month=cal_month) }}"
+       class="mc-left-panel-item {% if visit_type_filter=='new' %}active{% endif %}">
+      <div style="width:20px;height:20px;border-radius:50%;background:#2563eb;color:#fff;
+                  display:flex;align-items:center;justify-content:center;
+                  font-size:.65rem;font-weight:800;flex-shrink:0">N</div>
+      New Patient
+      <span class="mc-left-panel-count" style="background:#dbeafe;color:#1d4ed8">{{ counts.new }}</span>
+    </a>
+
+    <a href="{{ url_for('opd.index', tab=tab, date=filter_date.isoformat(), visit_type='followup', cal_year=cal_year, cal_month=cal_month) }}"
+       class="mc-left-panel-item {% if visit_type_filter=='followup' %}active{% endif %}">
+      <div style="width:20px;height:20px;border-radius:50%;background:#059669;color:#fff;
+                  display:flex;align-items:center;justify-content:center;
+                  font-size:.65rem;font-weight:800;flex-shrink:0">O</div>
+      Old Patient
+      <span class="mc-left-panel-count" style="background:#d1fae5;color:#065f46">{{ counts.followup }}</span>
+    </a>
+
+    <a href="{{ url_for('opd.index', tab=tab, date=filter_date.isoformat(), visit_type='review', cal_year=cal_year, cal_month=cal_month) }}"
+       class="mc-left-panel-item {% if visit_type_filter=='review' %}active{% endif %}">
+      <div style="width:20px;height:20px;border-radius:50%;background:#d97706;color:#fff;
+                  display:flex;align-items:center;justify-content:center;
+                  font-size:.65rem;font-weight:800;flex-shrink:0">R</div>
+      Review
+      <span class="mc-left-panel-count" style="background:#fef3c7;color:#92400e">{{ counts.review }}</span>
+    </a>
+
+    <hr class="mc-divider mx-2">
+    <div class="mc-left-panel-section">Status</div>
+
+    <div class="mc-left-panel-item">
+      <i class="bi bi-check-circle text-success"></i>
+      Completed
+      <span class="mc-left-panel-count" style="background:#d1fae5;color:#065f46">{{ counts.completed }}</span>
+    </div>
+    <div class="mc-left-panel-item">
+      <i class="bi bi-x-circle text-danger"></i>
+      Cancelled
+      <span class="mc-left-panel-count" style="background:#fee2e2;color:#991b1b">{{ counts.cancelled }}</span>
+    </div>
+
+    <!-- Quick navigation -->
+    <hr class="mc-divider mx-2">
+    <div class="mc-left-panel-section">Quick Nav</div>
+    <a href="{{ url_for('opd.index', tab=tab, date=today.isoformat(), cal_year=today.year, cal_month=today.month) }}"
+       class="mc-left-panel-item">
+      <i class="bi bi-calendar-check" style="color:#5b21b6"></i>
+      Today's Queue
+    </a>
+  </div>
+
+  <!-- ═══ MAIN CONTENT ═══ -->
+  <div class="mc-main-content" style="min-width:0">
+
+    <!-- Page header -->
+    <div class="mc-page-header">
+      <div>
+        <h1 class="mc-page-title" style="color:#3d1a78">
+          <i class="bi bi-hospital me-1"></i>
+          {% if tab=='ip_list' %}IP Patients — Admitted
+          {% elif tab=='all' %}All Appointments
+          {% else %}OP Patient List{% endif %}
+        </h1>
+        <div class="mc-breadcrumb">
+          {{ filter_date.strftime('%A, %d %B %Y') }}
+          {% if visit_type_filter %}
+          — <span class="text-muted">{{ visit_type_filter|title }} patients</span>
+          {% endif %}
+        </div>
+      </div>
+      <button class="btn btn-outline-secondary btn-sm no-print" data-print>
+        <i class="bi bi-printer me-1"></i>Print
+      </button>
+    </div>
+
+    <!-- ─── IP List tab ─── -->
+    {% if tab == 'ip_list' %}
+    <div class="mc-card">
+      <div class="mc-card-header" style="background:#f5f0ff">
+        <i class="bi bi-hospital" style="color:#5b21b6"></i>
+        <span style="color:#3d1a78">Admitted Patients</span>
+        <span class="badge ms-2" style="background:#5b21b6">{{ rows|length }}</span>
+      </div>
+      <div class="mc-card-body p-0">
+        <div class="mc-table-wrap">
+          <table class="mc-table">
+            <thead><tr><th>IP No.</th><th>Patient</th><th>Ward/Bed</th><th>Doctor</th><th>Admitted</th><th>Days</th><th>Status</th><th>Action</th></tr></thead>
+            <tbody>
+              {% for adm in rows %}
+              <tr>
+                <td><span class="mc-uhid">{{ adm.ip_number }}</span></td>
+                <td><div class="fw-semibold">{{ adm.patient.full_name }}</div><div class="text-muted small">{{ adm.patient.uhid }}</div></td>
+                <td class="small">{{ adm.ward.name if adm.ward else '—' }} / {{ adm.bed.bed_number if adm.bed else '—' }}</td>
+                <td class="small">{{ adm.doctor.full_name if adm.doctor else '—' }}</td>
+                <td class="small">{{ adm.admission_date.strftime('%d %b %Y') if adm.admission_date }}</td>
+                <td class="small">{% if adm.admission_date %}{{ (today - adm.admission_date.date()).days + 1 }}d{% endif %}</td>
+                <td><span class="mc-badge mc-badge-admitted">{{ adm.status|title }}</span></td>
+                <td><a href="{{ url_for('ipd.index') }}" class="btn btn-icon btn-outline-primary"><i class="bi bi-eye"></i></a></td>
+              </tr>
+              {% else %}
+              <tr><td colspan="8" class="text-center text-muted py-4">No admitted patients.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    {% else %}
+    <!-- ─── OP List (PDF page 1 main table) ─── -->
+    <div class="mc-card">
+      <div class="mc-card-header" style="background:#f5f0ff">
+        <i class="bi bi-calendar-check" style="color:#5b21b6"></i>
+        <span style="color:#3d1a78">
+          {% if visit_type_filter == 'new' %}New Patients
+          {% elif visit_type_filter == 'followup' %}Old Patients
+          {% elif visit_type_filter == 'review' %}Review Patients
+          {% else %}Today's Appointments{% endif %}
+        </span>
+        <span class="badge ms-2" style="background:#5b21b6">{{ rows|length }}</span>
+      </div>
+      <div class="mc-card-body p-0">
+        <div class="mc-table-wrap">
+          <table class="mc-table">
+            <thead>
+              <tr>
+                <th style="min-width:50px">Token</th>
+                <th style="min-width:180px">Patient Details</th>
+                <th style="min-width:100px">Patient ID</th>
+                <th style="min-width:110px">Doctor Type</th>
+                <th style="min-width:90px">Last Visit</th>
+                <th style="min-width:60px">Review</th>
+                <th style="min-width:100px">BP (mmHg)</th>
+                <th style="min-width:70px">Weight</th>
+                <th style="min-width:70px">Height</th>
+                <th style="min-width:110px">Payment Status</th>
+                <th style="min-width:90px">Payment Type</th>
+                <th style="min-width:120px">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for a in rows %}
+              {% set consult = a.consultation if a.consultation else none %}
+              <tr>
+                <!-- Token -->
+                <td>
+                  <div style="width:32px;height:32px;border-radius:50%;
+                               background:#3d1a78;color:#fff;
+                               display:flex;align-items:center;justify-content:center;
+                               font-size:.75rem;font-weight:700">
+                    {{ a.token_number or '—' }}
+                  </div>
+                </td>
+                <!-- Patient Details -->
+                <td>
+                  <div class="fw-semibold">{{ a.patient.full_name }}</div>
+                  <div class="text-muted small">
+                    {{ a.patient.age_years or '' }}{% if a.patient.age_years %}y{% endif %}
+                    {% if a.patient.gender %} / {{ a.patient.gender[0] }}{% endif %}
+                  </div>
+                  <span class="mc-badge {% if a.visit_type=='new' %}mc-badge-new{% elif a.visit_type=='review' %}mc-badge-review{% else %}mc-badge-old{% endif %}" style="font-size:.62rem">
+                    {% if a.visit_type == 'new' %}N — New
+                    {% elif a.visit_type == 'review' %}R — Review
+                    {% else %}O — Old{% endif %}
+                  </span>
+                </td>
+                <!-- Patient ID / UHID -->
+                <td><span class="mc-uhid">{{ a.patient.uhid }}</span></td>
+                <!-- Doctor Type / Specialisation -->
+                <td class="small">{{ a.doctor.specialisation or a.doctor.full_name if a.doctor else '—' }}</td>
+                <!-- Last Visit -->
+                <td class="small text-muted">
+                  {% set prev = namespace(found=none) %}
+                  {% for appt in a.patient.appointments %}
+                    {% if appt.id != a.id and appt.status == 'completed' %}
+                      {% set prev.found = appt %}
+                    {% endif %}
+                  {% endfor %}
+                  {{ prev.found.appointment_date.strftime('%d.%m.%y') if prev.found else '—' }}
+                </td>
+                <!-- Review marker -->
+                <td class="small text-center">
+                  {% if a.visit_type == 'review' %}
+                  <span class="badge" style="background:#fef3c7;color:#92400e;font-size:.65rem">Rev</span>
+                  {% else %}—{% endif %}
+                </td>
+                <!-- BP -->
+                <td class="small">
+                  {% if consult and consult.bp_systolic %}
+                  <span class="{% if consult.bp_systolic > 140 %}text-danger fw-bold{% endif %}">
+                    {{ consult.bp_systolic }}/{{ consult.bp_diastolic }}
+                  </span>
+                  {% else %}—{% endif %}
+                </td>
+                <!-- Weight -->
+                <td class="small">
+                  {% if consult and consult.weight_kg %}{{ consult.weight_kg }}kg{% else %}—{% endif %}
+                </td>
+                <!-- Height -->
+                <td class="small">
+                  {% if consult and consult.height_cm %}{{ consult.height_cm }}cm{% else %}—{% endif %}
+                </td>
+                <!-- Payment Status -->
+                <td>
+                  {% set bill = a.patient.bills.filter_by(is_deleted=False).order_by('id desc').first() if a.patient.bills else none %}
+                  {% if bill %}
+                  <span class="mc-badge {% if bill.status=='paid' %}mc-badge-paid{% elif bill.status=='partial' %}mc-badge-partial{% else %}mc-badge-unpaid{% endif %}">
+                    {{ bill.status|title }}
+                  </span>
+                  {% else %}
+                  <span class="mc-badge mc-badge-unpaid" style="font-size:.65rem">Pending</span>
+                  {% endif %}
+                </td>
+                <!-- Payment Type -->
+                <td class="small text-muted">
+                  {% if bill %}
+                  {% set pmt = bill.payments.filter_by(is_deleted=False).first() %}
+                  {{ pmt.payment_mode|title if pmt else '—' }}
+                  {% else %}—{% endif %}
+                </td>
+                <!-- Actions -->
+                <td>
+                  <div class="d-flex gap-1 flex-wrap">
+                    <a href="{{ url_for('patients.view', patient_id=a.patient_id) }}"
+                       class="btn btn-icon btn-outline-primary" title="Patient Details"
+                       style="width:28px;height:28px">
+                      <i class="bi bi-eye" style="font-size:.8rem"></i>
+                    </a>
+                    {% if current_user.has_permission('opd','create') and a.status not in ['completed','cancelled'] %}
+                    <a href="{{ url_for('opd.consultation', appt_id=a.id) }}"
+                       class="btn btn-icon btn-sm" title="Consultation"
+                       style="width:28px;height:28px;background:#5b21b6;color:#fff;border:none;border-radius:6px">
+                      <i class="bi bi-clipboard2-pulse" style="font-size:.8rem"></i>
+                    </a>
+                    {% endif %}
+                    {% if a.status not in ['completed','cancelled'] %}
+                    <form method="POST" action="{{ url_for('opd.update_status', appt_id=a.id) }}" class="d-inline">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                      <input type="hidden" name="status" value="cancelled">
+                      <button type="submit" class="btn btn-icon btn-outline-danger btn-sm"
+                              style="width:28px;height:28px" title="Cancel"
+                              data-confirm="Cancel this appointment?">
+                        <i class="bi bi-x-circle" style="font-size:.8rem"></i>
+                      </button>
+                    </form>
+                    {% endif %}
+                    <a href="{{ url_for('billing.new_bill') }}?patient_id={{ a.patient_id }}"
+                       class="btn btn-icon btn-outline-secondary btn-sm"
+                       style="width:28px;height:28px" title="Billing">
+                      <i class="bi bi-receipt" style="font-size:.8rem"></i>
+                    </a>
+                  </div>
+                </td>
+              </tr>
+              {% else %}
+              <tr><td colspan="12" class="text-center text-muted py-5">
+                <i class="bi bi-calendar2-x" style="font-size:2.5rem;opacity:.2;display:block;margin-bottom:8px"></i>
+                No appointments for {{ filter_date.strftime('%d %B %Y') }}
+                {% if visit_type_filter %} ({{ visit_type_filter }}){% endif %}.
+                {% if filter_date > today %}
+                <br><a href="{{ url_for('opd.book') }}" class="btn btn-primary btn-sm mt-2">
+                  <i class="bi bi-plus-circle me-1"></i>Book Appointment
+                </a>
+                {% endif %}
+              </td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Footer summary row -->
+      {% if rows %}
+      <div class="mc-card-body border-top" style="background:#f8f5ff;font-size:.8rem">
+        <div class="d-flex gap-4 flex-wrap align-items-center">
+          <span><strong>Total:</strong> {{ rows|length }}</span>
+          <span><strong>Seen:</strong> {{ rows|selectattr('status','eq','completed')|list|length }}</span>
+          <span><strong>Waiting:</strong> {{ rows|rejectattr('status','eq','completed')|rejectattr('status','eq','cancelled')|list|length }}</span>
+          <span><strong>Cancelled:</strong> {{ rows|selectattr('status','eq','cancelled')|list|length }}</span>
+          <span class="ms-auto">
+            <span class="me-2">
+              <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#2563eb"></span>
+              N={{ counts.new }}
+            </span>
+            <span class="me-2">
+              <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#059669"></span>
+              O={{ counts.followup }}
+            </span>
+            <span>
+              <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#d97706"></span>
+              R={{ counts.review }}
+            </span>
+          </span>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+    {% endif %}
+
+  </div><!-- end mc-main-content -->
+</div><!-- end mc-layout -->
+
+<!-- Mobile filter toggle -->
+<button id="mobile-filter-btn"
+        style="display:none;position:fixed;bottom:20px;right:20px;width:52px;height:52px;
+               border-radius:50%;background:#3d1a78;color:#fff;border:none;
+               box-shadow:0 4px 16px rgba(61,26,120,.4);font-size:1.2rem;z-index:1040"
+        onclick="document.querySelector('.mc-left-panel').classList.toggle('open')">
+  <i class="bi bi-funnel"></i>
+</button>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Show mobile filter button on small screens
+if (window.innerWidth <= 768) {
+  document.getElementById('mobile-filter-btn').style.display = 'flex';
+  document.getElementById('mobile-filter-btn').style.alignItems = 'center';
+  document.getElementById('mobile-filter-btn').style.justifyContent = 'center';
+}
+
+// Highlight today's date in calendar
+document.addEventListener('DOMContentLoaded', function() {
+  // Calendar dots tooltip — show appointment count on hover
+  document.querySelectorAll('[data-appt-count]').forEach(el => {
+    const cnt = el.dataset.apptCount;
+    if (cnt > 0) el.title = cnt + ' appointment' + (cnt > 1 ? 's' : '');
+  });
+});
+</script>
+{% endblock %}

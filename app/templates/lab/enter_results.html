@@ -1,407 +1,104 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Enter Results — {{ order.order_number }}</title>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-<style>
-:root{--p:#3d1a78;--pm:#5b21b6;--border:#e9d5ff}
-*{font-family:'DM Sans',sans-serif;box-sizing:border-box}
-body{background:#f8f5ff;color:#1f2937;margin:0}
-.mc-subnav{display:flex;align-items:center;background:#fff;border-bottom:2px solid var(--border);
-  padding:0 8px;min-height:44px;gap:0}
-.mc-subnav-item{padding:10px 14px;font-size:.8rem;font-weight:500;color:#6b7280;
-  text-decoration:none;border-bottom:2px solid transparent;white-space:nowrap}
-.mc-subnav-item.active{color:var(--p);border-bottom-color:var(--p);font-weight:700}
-.mc-card{background:#fff;border:1px solid var(--border);border-radius:12px;overflow:hidden;
-  margin-bottom:16px;box-shadow:0 1px 4px rgba(61,26,120,.06)}
-.mc-card-header{display:flex;align-items:center;gap:8px;padding:10px 16px;
-  background:#f5f0ff;font-size:.82rem;font-weight:600;border-bottom:1px solid var(--border)}
-.mc-card-body{padding:16px}
-.mc-table-wrap{overflow-x:auto}
-.mc-table{width:100%;border-collapse:collapse;font-size:.8rem}
-.mc-table thead tr{background:#f5f0ff}
-.mc-table th{padding:9px 12px;font-weight:700;color:var(--p);border-bottom:2px solid var(--border);white-space:nowrap}
-.mc-table td{padding:9px 12px;border-bottom:1px solid #f3e8ff;vertical-align:middle}
-.mc-table tbody tr:hover{background:#faf5ff}
-.mc-label{font-size:.75rem;font-weight:600;color:#374151;margin-bottom:4px;display:block}
-.flag-normal{background:#d1fae5;color:#065f46;padding:2px 8px;border-radius:20px;font-size:.7rem;font-weight:600}
-.flag-high,.flag-low{background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:20px;font-size:.7rem;font-weight:700}
-.flag-critical{background:#fee2e2;color:#991b1b;padding:2px 8px;border-radius:20px;font-size:.7rem;font-weight:700}
-.result-input{transition:border-color .2s,background .2s}
-.result-normal{border-color:#059669!important;background:#f0fdf4!important}
-.result-abnormal{border-color:#d97706!important;background:#fffbeb!important}
-.result-critical{border-color:#dc2626!important;background:#fff8f8!important}
-</style>
-</head>
-<body>
-
-<div class="mc-subnav">
-  <a href="{{ url_for('lab.index', tab='results') }}" class="mc-subnav-item">
-    <i class="bi bi-arrow-left me-1"></i>Results Queue
-  </a>
-  <span class="mc-subnav-item active">
-    <i class="bi bi-pencil-square me-1"></i>Enter Results
-  </span>
-  <div class="ms-auto d-flex gap-2 pe-3 align-items-center">
-    <span style="background:#ede9fe;color:#5b21b6;padding:2px 10px;border-radius:6px;
-                 font-size:.72rem;font-weight:700;font-family:monospace">
-      {{ order.order_number }}
-    </span>
-    <span style="padding:2px 8px;border-radius:20px;font-size:.7rem;font-weight:600;
-          background:{% if order.priority=='stat' %}#fee2e2;color:#991b1b
-          {% elif order.priority=='urgent' %}#fef3c7;color:#92400e
-          {% else %}#f3f4f6;color:#374151{% endif %}">
-      {{ order.priority|title }}
-    </span>
-    {% if locked %}
-    <span style="background:#d1fae5;color:#065f46;padding:3px 10px;border-radius:20px;
-                 font-size:.72rem;font-weight:700">
-      <i class="bi bi-lock me-1"></i>Approved & Locked
-    </span>
-    {% endif %}
+{% extends "shared/base.html" %}
+{% block title %}Enter Results — {{ order.order_number }}{% endblock %}
+{% block content %}
+<div class="mc-page-header">
+  <div>
+    <h1 class="mc-page-title"><i class="bi bi-pencil-square"></i> Enter Results — {{ order.order_number }}</h1>
+    <div class="mc-breadcrumb">
+      <a href="{{ url_for('lab.index', tab='results') }}">Lab</a> / Results / {{ order.order_number }}
+    </div>
   </div>
+  <a href="{{ url_for('lab.index', tab='results') }}" class="btn btn-outline-secondary btn-sm">← Back</a>
 </div>
 
-<div style="padding:16px 20px">
-
-  <!-- Critical alert banner -->
-  {% set crits = items|selectattr('result')|selectattr('result.is_critical')|list %}
-  {% if crits %}
-  <div style="background:#fff1f2;border:1px solid #fecdd3;border-radius:8px;
-              padding:10px 16px;display:flex;align-items:center;gap:10px;
-              margin-bottom:14px;color:#991b1b;font-size:.83rem">
-    <i class="bi bi-exclamation-triangle-fill" style="font-size:1.1rem"></i>
-    <strong>CRITICAL VALUES:</strong>
-    {% for item in crits %}
-    <span style="background:#dc2626;color:#fff;padding:2px 8px;border-radius:4px;
-                 font-size:.72rem;font-weight:700">
-      {{ item.test_name }}: {{ item.result.result_value }}
-      {{ item.result.result_unit or '' }}
-    </span>
-    {% endfor %}
-  </div>
-  {% endif %}
-
-  <!-- Locked notice -->
-  {% if locked %}
-  <div style="background:#fef3c7;border:1px solid #fde68a;border-radius:8px;
-              padding:10px 16px;margin-bottom:14px;font-size:.83rem;color:#92400e">
-    <i class="bi bi-lock me-2"></i>
-    Report approved by
-    <strong>{{ order.approval.approver.full_name }}</strong>
-    on {{ order.approval.approved_at.strftime('%d %b %Y %H:%M') }}.
-    Results are locked and cannot be edited.
-    {% if current_user.is_superadmin %}
-    <button class="btn btn-sm btn-warning ms-2" data-bs-toggle="modal"
-            data-bs-target="#unlockModal">
-      Unlock for Editing
-    </button>
-    {% endif %}
-  </div>
-  {% endif %}
-
-  <!-- Patient strip -->
-  <div class="mc-card">
-    <div class="mc-card-body py-2 px-3"
-         style="background:linear-gradient(90deg,#f5f0ff,#fff)">
-      <div class="row align-items-center g-2">
-        <div class="col-auto">
-          <div style="width:40px;height:40px;border-radius:50%;background:#ede9fe;
-                      display:flex;align-items:center;justify-content:center">
-            <i class="bi bi-person" style="color:#5b21b6;font-size:1.1rem"></i>
-          </div>
+<!-- Patient info strip -->
+<div class="mc-card mb-3">
+  <div class="mc-card-body py-2 px-3">
+    <div class="d-flex gap-3 align-items-center flex-wrap">
+      <div class="mc-stat-icon navy" style="width:38px;height:38px"><i class="bi bi-person" style="font-size:1rem"></i></div>
+      <div>
+        <div class="fw-bold">{{ patient.full_name if patient else '—' }}
+          <span class="mc-uhid ms-2">{{ patient.uhid if patient else '' }}</span>
         </div>
-        <div class="col">
-          <div style="font-weight:700;font-size:.95rem">
-            {{ patient.full_name if patient else '—' }}
-            <span style="background:#ede9fe;color:#5b21b6;padding:1px 8px;border-radius:6px;
-                         font-size:.68rem;font-family:monospace;margin-left:8px">
-              {{ patient.uhid if patient else '—' }}
-            </span>
-            {% if patient %}
-            <span class="text-muted" style="font-size:.78rem;margin-left:6px">
-              {{ patient.age_years or '' }}{% if patient.age_years %}y{% endif %}
-              {% if patient.gender %} / {{ patient.gender[0] }}{% endif %}
-            </span>
-            {% endif %}
-          </div>
-          <div class="text-muted" style="font-size:.75rem;margin-top:2px">
-            <i class="bi bi-telephone me-1"></i>{{ patient.phone if patient else '—' }}
-            &nbsp;|&nbsp; {{ order.ordered_at.strftime('%d %b %Y %H:%M') }}
-            {% if order.sample and order.sample.collected_at %}
-            &nbsp;|&nbsp; <i class="bi bi-droplet me-1"></i>
-            Collected {{ order.sample.collected_at.strftime('%H:%M') }}
-            {% if order.sample.phlebotomist %}
-            by {{ order.sample.phlebotomist.full_name }}
-            {% endif %}
-            {% if order.sample.is_fasting %}
-            <span style="background:#fef3c7;color:#92400e;padding:1px 6px;
-                         border-radius:4px;font-size:.65rem;font-weight:700;margin-left:4px">
-              FASTING
-            </span>
-            {% endif %}
-            {% endif %}
-          </div>
+        <div class="text-muted small">
+          {{ patient.age_years or '' }}{% if patient.age_years %}y{% endif %}
+          {{ patient.gender or '' }} | Ph: {{ patient.phone if patient else '' }}
         </div>
-        <div class="col-auto text-end">
-          <div style="font-size:.78rem;font-weight:600;color:#3d1a78">
-            {{ order.doctor.full_name if order.doctor else '—' }}
-          </div>
-          {% if order.clinical_info %}
-          <div class="text-muted" style="font-size:.7rem">
-            {{ order.clinical_info[:80] }}
-          </div>
-          {% endif %}
-        </div>
+      </div>
+      <div class="ms-auto text-end small">
+        <div class="text-muted">Priority</div>
+        <div><span class="mc-badge {% if order.priority=='stat' %}mc-badge-cancelled{% elif order.priority=='urgent' %}mc-badge-review{% else %}mc-badge-old{% endif %}">{{ order.priority|title }}</span></div>
       </div>
     </div>
   </div>
-
-  <!-- Results entry form -->
-  {% if not locked %}
-  <form method="POST" action="{{ url_for('lab.enter_results', order_id=order.id) }}"
-        id="resultsForm">
-  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-  {% endif %}
-
-  <div class="mc-card">
-    <div class="mc-card-header" style="background:#f5f0ff">
-      <i class="bi bi-flask" style="color:#5b21b6"></i>
-      <span style="color:#3d1a78">Test Results</span>
-      <span class="badge ms-2" style="background:#5b21b6;color:#fff">
-        {{ items|length }} test(s)
-      </span>
-      {% if not locked %}
-      <span class="text-muted ms-2" style="font-size:.72rem">
-        Values update flags in real-time as you type
-      </span>
-      {% endif %}
-    </div>
-    <div class="mc-card-body p-0">
-      <div class="mc-table-wrap">
-        <table class="mc-table">
-          <thead>
-            <tr>
-              <th style="min-width:160px">Test Name</th>
-              <th style="min-width:40px">Sample</th>
-              <th style="min-width:150px">Result Value</th>
-              <th>Unit</th>
-              <th style="min-width:110px">Normal Range</th>
-              <th style="min-width:90px">Male Range</th>
-              <th style="min-width:90px">Female Range</th>
-              <th style="min-width:70px">Flag</th>
-              <th style="min-width:160px">Remarks</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for item in items %}
-            {% set res = item.result %}
-            <tr class="{% if res and res.is_critical %}table-danger
-                        {% elif res and res.is_abnormal %}table-warning{% endif %}">
-              <td>
-                <div style="font-weight:600">{{ item.test_name }}</div>
-                {% if item.test_code %}
-                <span style="background:#ede9fe;color:#5b21b6;padding:1px 6px;
-                             border-radius:4px;font-size:.62rem;font-family:monospace">
-                  {{ item.test_code }}
-                </span>
-                {% endif %}
-              </td>
-              <td class="text-muted" style="font-size:.75rem">
-                {{ item.sample_type or '—' }}
-              </td>
-              <td>
-                <div class="d-flex align-items-center gap-1">
-                  <input type="{% if locked %}text{% else %}text{% endif %}"
-                         name="result_{{ item.id }}"
-                         class="form-control form-control-sm result-input"
-                         id="ri-{{ item.id }}"
-                         style="width:100px;{% if res and res.is_critical %}
-                                border-color:#dc2626;background:#fff8f8
-                                {% elif res and res.is_abnormal %}
-                                border-color:#d97706;background:#fffbeb{% endif %}"
-                         value="{{ res.result_value if res else '' }}"
-                         placeholder="Enter value"
-                         {% if locked %}readonly{% endif %}
-                         data-nlow="{{ item.test.normal_low or '' }}"
-                         data-nhigh="{{ item.test.normal_high or '' }}"
-                         data-clow="{{ item.test.critical_low or '' }}"
-                         data-chigh="{{ item.test.critical_high or '' }}"
-                         data-item="{{ item.id }}">
-                </div>
-              </td>
-              <td class="text-muted" style="font-size:.75rem">
-                {{ item.test.unit if item.test else '—' }}
-              </td>
-              <td style="font-size:.75rem;color:#374151">
-                {{ item.test.normal_range if item.test else '—' }}
-                {% if item.test and item.test.normal_range_text %}
-                <div class="text-muted" style="font-size:.65rem">
-                  {{ item.test.normal_range_text }}
-                </div>
-                {% endif %}
-              </td>
-              <td class="text-muted" style="font-size:.75rem">
-                {{ item.test.male_range if item.test else '—' }}
-              </td>
-              <td class="text-muted" style="font-size:.75rem">
-                {{ item.test.female_range if item.test else '—' }}
-              </td>
-              <td>
-                <!-- Flag computed live in JS; also shows saved flag on load -->
-                <span id="flag-{{ item.id }}">
-                  {% if res %}
-                    {% if res.is_critical %}
-                    <span class="flag-critical">
-                      <i class="bi bi-exclamation-triangle me-1"></i>{{ res.abnormal_flag or 'CRIT' }}
-                    </span>
-                    {% elif res.is_abnormal %}
-                    <span class="flag-{{ 'high' if res.abnormal_flag == 'H' else 'low' }}">
-                      {{ res.abnormal_flag }}
-                    </span>
-                    {% else %}
-                    <span class="flag-normal">Normal</span>
-                    {% endif %}
-                  {% else %}
-                  <span class="text-muted" style="font-size:.75rem">—</span>
-                  {% endif %}
-                </span>
-              </td>
-              <td>
-                <input type="text" name="remarks_{{ item.id }}"
-                       class="form-control form-control-sm"
-                       value="{{ res.remarks if res else '' }}"
-                       placeholder="Optional remark…"
-                       {% if locked %}readonly{% endif %}>
-              </td>
-            </tr>
-            {% else %}
-            <tr><td colspan="9" class="text-center text-muted py-4">
-              No tests in this order.
-            </td></tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </div>
-
-  <!-- Action buttons -->
-  {% if not locked %}
-  <div class="d-flex gap-3 flex-wrap">
-    <button type="submit" class="btn py-2 px-4"
-            style="background:#3d1a78;color:#fff;border:none;font-weight:700">
-      <i class="bi bi-floppy me-1"></i>Save Results
-    </button>
-    <a href="{{ url_for('lab.index', tab='results') }}"
-       class="btn btn-outline-secondary">Cancel</a>
-
-    {% if order.status == 'resulted' %}
-    <form method="POST"
-          action="{{ url_for('lab.approve_report', order_id=order.id) }}"
-          class="d-inline ms-auto"
-          onsubmit="return confirm('Approve and lock this report permanently?')">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <input type="hidden" name="approver_note" value="">
-      <button type="submit" class="btn btn-success py-2 px-4" style="font-weight:700">
-        <i class="bi bi-check-circle me-1"></i>Approve & Lock Report
-      </button>
-    </form>
-    {% endif %}
-  </div>
-
-  </form>
-  {% else %}
-  <div class="d-flex gap-2">
-    <a href="{{ url_for('lab.view_report', order_id=order.id) }}"
-       class="btn btn-outline-primary">
-      <i class="bi bi-eye me-1"></i>View Approved Report
-    </a>
-    <a href="{{ url_for('lab.view_report', order_id=order.id) }}?print=1"
-       class="btn btn-outline-secondary" target="_blank">
-      <i class="bi bi-printer me-1"></i>Print Report
-    </a>
-  </div>
-  {% endif %}
-
 </div>
 
-<!-- Unlock modal (superadmin only) -->
-{% if locked and current_user.is_superadmin and order.approval %}
-<div class="modal fade" id="unlockModal" tabindex="-1">
-<div class="modal-dialog"><div class="modal-content">
-<div class="modal-header" style="background:#fef3c7">
-  <h5 class="modal-title" style="color:#92400e">
-    <i class="bi bi-unlock me-2"></i>Unlock Approved Report
-  </h5>
-  <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-</div>
-<form method="POST" action="{{ url_for('lab.unlock_report', order_id=order.id) }}">
+<form method="POST" action="{{ url_for('lab.enter_results', order_id=order.id) }}">
 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-<div class="modal-body">
-  <div class="alert alert-warning" style="font-size:.82rem">
-    <i class="bi bi-exclamation-triangle me-1"></i>
-    Unlocking allows result values to be edited. This action is logged.
-    Original approval will be voided.
+<div class="mc-card mb-3">
+  <div class="mc-card-header"><i class="bi bi-flask"></i> Test Results</div>
+  <div class="mc-card-body p-0">
+    <div class="mc-table-wrap">
+      <table class="mc-table">
+        <thead>
+          <tr>
+            <th>Test Name</th><th>Sample Type</th><th>Normal Range</th>
+            <th>Result Value</th><th>Unit</th><th>Remarks</th><th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in items %}
+          {% set test = item.test %}
+          {% set existing = item.results.filter_by(is_deleted=False).first() if item.results else none %}
+          <tr class="{% if existing and existing.is_critical %}table-danger{% elif existing and existing.is_abnormal %}table-warning{% endif %}">
+            <td class="fw-semibold">{{ test.name if test else '—' }}</td>
+            <td class="small text-muted">{{ test.sample_type if test else '—' }}</td>
+            <td class="small">
+              {{ test.normal_range if test else '—' }}
+              {% if test and test.unit %}<span class="text-muted"> {{ test.unit }}</span>{% endif %}
+            </td>
+            <td style="min-width:120px">
+              <input type="text" name="result_{{ item.id }}"
+                     class="form-control form-control-sm"
+                     value="{{ existing.result_value if existing else '' }}"
+                     placeholder="Enter value">
+            </td>
+            <td class="small text-muted">{{ test.unit if test else '' }}</td>
+            <td style="min-width:160px">
+              <input type="text" name="remarks_{{ item.id }}"
+                     class="form-control form-control-sm"
+                     value="{{ existing.remarks if existing else '' }}"
+                     placeholder="Optional remarks">
+            </td>
+            <td>
+              {% if existing %}
+              <span class="mc-badge {% if existing.is_critical %}mc-badge-cancelled{% elif existing.is_abnormal %}mc-badge-review{% else %}mc-badge-done{% endif %}">
+                {% if existing.is_critical %}Critical{% elif existing.is_abnormal %}Abnormal{% else %}Normal{% endif %}
+              </span>
+              {% else %}
+              <span class="mc-badge mc-badge-old">Pending</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
   </div>
-  <label class="mc-label" style="color:#dc2626">Reason for Unlocking *</label>
-  <textarea name="unlock_reason" class="form-control" rows="3" required
-            placeholder="State reason for unlocking this report…"></textarea>
 </div>
-<div class="modal-footer">
-  <button type="button" class="btn btn-outline-secondary"
-          data-bs-dismiss="modal">Cancel</button>
-  <button type="submit" class="btn btn-warning">Unlock Report</button>
+<div class="d-flex gap-2">
+  <button type="submit" name="action" value="save" class="btn btn-primary">
+    <i class="bi bi-floppy me-1"></i>Save Results
+  </button>
+  <a href="{{ url_for('lab.index', tab='results') }}" class="btn btn-outline-secondary">Cancel</a>
+  {% if current_user.has_permission('lab','verify') %}
+  <form method="POST" action="{{ url_for('lab.verify_results', order_id=order.id) }}" class="d-inline ms-auto">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button type="submit" class="btn btn-success" data-confirm="Verify and finalise this report?">
+      <i class="bi bi-check2-circle me-1"></i>Verify & Finalise Report
+    </button>
+  </form>
+  {% endif %}
 </div>
 </form>
-</div></div></div>
-{% endif %}
-
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-<script>
-// Live flag computation as user types
-document.querySelectorAll('.result-input').forEach(inp => {
-  inp.addEventListener('input', function() {
-    const val  = parseFloat(this.value);
-    const cL   = parseFloat(this.dataset.clow);
-    const cH   = parseFloat(this.dataset.chigh);
-    const nL   = parseFloat(this.dataset.nlow);
-    const nH   = parseFloat(this.dataset.nhigh);
-    const flagEl = document.getElementById('flag-' + this.dataset.item);
-    if (!flagEl) return;
-
-    // Remove old classes
-    this.classList.remove('result-normal','result-abnormal','result-critical');
-
-    if (isNaN(val)) {
-      flagEl.innerHTML = '<span class="text-muted" style="font-size:.75rem">—</span>';
-      return;
-    }
-
-    if (!isNaN(cL) && val < cL) {
-      flagEl.innerHTML = '<span class="flag-critical">⚠ LL Critical</span>';
-      this.classList.add('result-critical');
-    } else if (!isNaN(cH) && val > cH) {
-      flagEl.innerHTML = '<span class="flag-critical">⚠ HH Critical</span>';
-      this.classList.add('result-critical');
-    } else if (!isNaN(nL) && val < nL) {
-      flagEl.innerHTML = '<span class="flag-low">L Low</span>';
-      this.classList.add('result-abnormal');
-    } else if (!isNaN(nH) && val > nH) {
-      flagEl.innerHTML = '<span class="flag-high">H High</span>';
-      this.classList.add('result-abnormal');
-    } else {
-      flagEl.innerHTML = '<span class="flag-normal">Normal</span>';
-      this.classList.add('result-normal');
-    }
-  });
-  // Trigger on load for pre-filled values
-  if (inp.value) inp.dispatchEvent(new Event('input'));
-});
-</script>
-</body>
-</html>
+{% endblock %}

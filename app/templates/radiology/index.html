@@ -1,0 +1,176 @@
+{% extends "shared/base.html" %}
+{% block title %}Radiology{% endblock %}
+{% block subnav %}
+<div class="mc-subnav">
+  {% for tid, lbl in [('orders','Orders'),('reports','Enter Reports'),('investigations','Investigation Master')] %}
+  <a href="{{ url_for('radiology.index', tab=tid) }}" class="mc-subnav-item {% if tab==tid %}active{% endif %}">{{ lbl }}</a>
+  {% endfor %}
+  <div class="ms-auto pe-2">
+    {% if tab == 'investigations' %}<button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addInvModal"><i class="bi bi-plus-circle me-1"></i>Add Investigation</button>
+    {% else %}<button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#newOrderModal"><i class="bi bi-plus-circle me-1"></i>New Order</button>{% endif %}
+  </div>
+</div>
+{% endblock %}
+{% block content %}
+<div class="mc-page-header">
+  <h1 class="mc-page-title"><i class="bi bi-activity"></i>
+    {% if tab=='orders' %}Radiology Orders{% elif tab=='reports' %}Enter Reports{% else %}Investigation Master{% endif %}
+  </h1>
+</div>
+
+{% if tab == 'investigations' %}
+<div class="mc-card"><div class="mc-card-body p-0 mc-table-wrap">
+  <table class="mc-table mc-datatable">
+    <thead><tr><th>Code</th><th>Investigation</th><th>Category</th><th>Price</th><th>Preparation</th><th>Status</th></tr></thead>
+    <tbody>
+      {% for inv in investigations.items %}
+      <tr>
+        <td><span class="mc-uhid">{{ inv.code or '—' }}</span></td>
+        <td class="fw-semibold">{{ inv.name }}</td>
+        <td><span class="mc-badge mc-badge-new">{{ inv.category|upper }}</span></td>
+        <td>₹{{ "{:,.2f}".format(inv.price or 0) }}</td>
+        <td class="small text-muted">{{ (inv.preparation or '—')[:60] }}</td>
+        <td><span class="mc-badge {% if inv.is_active %}mc-badge-active{% else %}mc-badge-inactive{% endif %}">{{ 'Active' if inv.is_active else 'Inactive' }}</span></td>
+      </tr>
+      {% else %}
+      <tr><td colspan="6" class="text-center text-muted py-4">No investigations configured.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div></div>
+
+{% elif tab == 'reports' %}
+<div class="mc-card"><div class="mc-card-body p-0 mc-table-wrap">
+  <table class="mc-table">
+    <thead><tr><th>Order No.</th><th>Patient</th><th>Investigation</th><th>Ordered</th><th>Priority</th><th>Action</th></tr></thead>
+    <tbody>
+      {% for o in orders.items %}
+      <tr>
+        <td><span class="mc-uhid">{{ o.order_number }}</span></td>
+        <td class="fw-semibold">{{ o.patient.full_name if o.patient else '—' }}</td>
+        <td class="small">{{ o.investigation.name if o.investigation else '—' }}</td>
+        <td class="small">{{ o.ordered_at.strftime('%d-%m-%Y %H:%M') if o.ordered_at else '—' }}</td>
+        <td><span class="mc-badge {% if o.priority=='stat' %}mc-badge-cancelled{% elif o.priority=='urgent' %}mc-badge-review{% else %}mc-badge-old{% endif %}">{{ o.priority|title }}</span></td>
+        <td><a href="{{ url_for('radiology.enter_report', order_id=o.id) }}" class="btn btn-sm btn-teal"><i class="bi bi-pencil-square me-1"></i>Enter Report</a></td>
+      </tr>
+      {% else %}
+      <tr><td colspan="6" class="text-center text-success py-4"><i class="bi bi-check-circle me-2"></i>No pending reports.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div></div>
+
+{% else %}
+<!-- Orders -->
+<div class="mc-card mb-3"><div class="mc-card-body py-2">
+  <form method="GET" class="d-flex gap-2 align-items-center">
+    <input type="hidden" name="tab" value="orders">
+    <input type="date" name="date_filter" class="form-control form-control-sm" value="{{ date_filter }}" style="width:150px">
+    <button type="submit" class="btn btn-primary btn-sm">Filter</button>
+  </form>
+</div></div>
+<div class="mc-card"><div class="mc-card-body p-0 mc-table-wrap">
+  <table class="mc-table mc-datatable">
+    <thead><tr><th>Order No.</th><th>Patient</th><th>Investigation</th><th>Doctor</th><th>Priority</th><th>Price</th><th>Status</th><th>Action</th></tr></thead>
+    <tbody>
+      {% for o in orders.items %}
+      <tr>
+        <td><span class="mc-uhid">{{ o.order_number }}</span></td>
+        <td><div class="fw-semibold">{{ o.patient.full_name if o.patient else '—' }}</div><div class="text-muted small">{{ o.patient.uhid if o.patient else '' }}</div></td>
+        <td class="small">{{ o.investigation.name if o.investigation else '—' }}</td>
+        <td class="small text-muted">{{ o.doctor.full_name if o.doctor else '—' }}</td>
+        <td><span class="mc-badge {% if o.priority=='stat' %}mc-badge-cancelled{% elif o.priority=='urgent' %}mc-badge-review{% else %}mc-badge-old{% endif %}">{{ o.priority|title }}</span></td>
+        <td class="small">₹{{ "{:,.2f}".format(o.price or 0) }}</td>
+        <td><span class="mc-badge mc-badge-{% if o.status=='reported' %}done{% elif o.status=='in_progress' %}review{% elif o.status=='cancelled' %}cancelled{% else %}old{% endif %}">{{ o.status|replace('_',' ')|title }}</span></td>
+        <td>
+          {% if o.status in ['ordered','in_progress'] %}
+          <a href="{{ url_for('radiology.enter_report', order_id=o.id) }}" class="btn btn-icon btn-teal" title="Enter Report"><i class="bi bi-pencil-square"></i></a>
+          {% else %}
+          <span class="text-muted small">Reported</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="8" class="text-center text-muted py-5"><i class="bi bi-activity display-6 d-block mb-2 opacity-25"></i>No radiology orders.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div></div>
+{% endif %}
+
+<!-- New Order Modal -->
+<div class="modal fade" id="newOrderModal" tabindex="-1">
+<div class="modal-dialog"><div class="modal-content">
+<div class="modal-header"><h5 class="modal-title">New Radiology Order</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+<form method="POST" action="{{ url_for('radiology.order_save') }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+<div class="modal-body">
+  <div class="row g-3">
+    <div class="col-12">
+      <label class="mc-label required">Patient</label>
+      <div class="position-relative">
+        <input type="text" id="patient-search" class="form-control" placeholder="Search patient…" autocomplete="off">
+        <input type="hidden" name="patient_id" id="patient-id-field" required>
+        <div id="patient-results" class="position-absolute w-100 bg-white border rounded shadow-sm" style="display:none;z-index:2000;max-height:200px;overflow-y:auto"></div>
+      </div>
+    </div>
+    <div class="col-md-6">
+      <label class="mc-label required">Investigation</label>
+      <select name="investigation_id" class="form-select" required>
+        <option value="">— Select —</option>
+        {% for inv in investigations or [] %}<option value="{{ inv.id }}">{{ inv.name }} ({{ inv.category|upper }}) — ₹{{ "{:,.0f}".format(inv.price or 0) }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="col-md-6">
+      <label class="mc-label">Referring Doctor</label>
+      <select name="doctor_id" class="form-select">
+        <option value="">— Select —</option>
+        {% for d in doctors or [] %}<option value="{{ d.id }}">{{ d.full_name }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="col-md-4">
+      <label class="mc-label">Priority</label>
+      <select name="priority" class="form-select">
+        <option value="routine">Routine</option><option value="urgent">Urgent</option><option value="stat">Stat</option>
+      </select>
+    </div>
+    <div class="col-12">
+      <label class="mc-label">Clinical Info</label>
+      <input type="text" name="clinical_info" class="form-control" placeholder="Brief clinical information">
+    </div>
+  </div>
+</div>
+<div class="modal-footer">
+  <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+  <button type="submit" class="btn btn-primary">Create Order</button>
+</div>
+</form>
+</div></div></div>
+
+<!-- Add Investigation Modal -->
+<div class="modal fade" id="addInvModal" tabindex="-1">
+<div class="modal-dialog"><div class="modal-content">
+<div class="modal-header"><h5 class="modal-title">Add Investigation</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+<form method="POST" action="{{ url_for('radiology.investigation_save') }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+<div class="modal-body">
+  <div class="row g-3">
+    <div class="col-md-4"><label class="mc-label">Code</label><input type="text" name="code" class="form-control" placeholder="XR001"></div>
+    <div class="col-md-8"><label class="mc-label required">Name</label><input type="text" name="name" class="form-control" required placeholder="X-Ray Chest PA View"></div>
+    <div class="col-md-6">
+      <label class="mc-label">Category</label>
+      <select name="category" class="form-select">
+        {% for c in ['xray','usg','ct','mri','echo','pet','other'] %}<option value="{{ c }}">{{ c|upper }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="col-md-6"><label class="mc-label">Price (₹)</label><input type="number" name="price" class="form-control" step="0.01" value="0"></div>
+    <div class="col-12"><label class="mc-label">Patient Preparation</label><textarea name="preparation" class="form-control" rows="2" placeholder="Fasting required, contrast preparation…"></textarea></div>
+  </div>
+</div>
+<div class="modal-footer">
+  <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+  <button type="submit" class="btn btn-primary">Save</button>
+</div>
+</form>
+</div></div></div>
+{% endblock %}

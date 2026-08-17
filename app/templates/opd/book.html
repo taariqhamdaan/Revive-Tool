@@ -1,0 +1,89 @@
+{% extends "shared/base.html" %}
+{% block title %}Book Appointment{% endblock %}
+{% block content %}
+<div class="mc-page-header">
+  <div>
+    <h1 class="mc-page-title"><i class="bi bi-calendar-plus"></i> Book Appointment</h1>
+    <div class="mc-breadcrumb"><a href="{{ url_for('opd.index') }}">OPD</a> / Book Appointment</div>
+  </div>
+</div>
+<div class="row justify-content-center">
+<div class="col-md-7">
+<div class="mc-card">
+<div class="mc-card-body">
+<form method="POST" action="{{ url_for('opd.book') }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <div class="row g-3">
+    <div class="col-12">
+      <label class="mc-label required">Patient</label>
+      <div class="position-relative">
+        <input type="text" id="patient-search" class="form-control" placeholder="Search by name, UHID or phone…" autocomplete="off">
+        <input type="hidden" name="patient_id" id="patient-id-field" required>
+        <div id="patient-results" class="position-absolute w-100 bg-white border rounded shadow-sm" style="display:none;z-index:1000;max-height:220px;overflow-y:auto"></div>
+      </div>
+    </div>
+    <div class="col-md-6">
+      <label class="mc-label required">Doctor</label>
+      <select name="doctor_id" class="form-select" id="doctorSel" required>
+        <option value="">Select Doctor</option>
+        {% for d in doctors %}
+        <option value="{{ d.id }}">{{ d.title }} {{ d.full_name }}{% if d.specialisation %} — {{ d.specialisation }}{% endif %}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-6">
+      <label class="mc-label required">Appointment Date</label>
+      <input type="date" name="appointment_date" class="form-control" id="apptDate" value="{{ today }}" min="{{ today }}" required>
+    </div>
+    <div class="col-md-6">
+      <label class="mc-label">Slot Time</label>
+      <select name="slot_time" class="form-select" id="slotSel">
+        <option value="">-- Select Slot --</option>
+      </select>
+    </div>
+    <div class="col-md-6">
+      <label class="mc-label">Visit Type</label>
+      <select name="visit_type" class="form-select">
+        <option value="new">New Patient</option>
+        <option value="followup">Follow-up</option>
+        <option value="review">Review</option>
+      </select>
+    </div>
+    <div class="col-12">
+      <label class="mc-label">Chief Complaint / Reason</label>
+      <input type="text" name="reason" class="form-control" placeholder="Brief reason for visit">
+    </div>
+    <div class="col-12 d-flex gap-2">
+      <button type="submit" class="btn btn-primary"><i class="bi bi-calendar-check me-1"></i>Confirm Booking</button>
+      <a href="{{ url_for('opd.index') }}" class="btn btn-outline-secondary">Cancel</a>
+    </div>
+  </div>
+</form>
+</div></div>
+</div></div>
+{% endblock %}
+{% block scripts %}
+<script>
+const doctorSel = document.getElementById('doctorSel');
+const apptDate  = document.getElementById('apptDate');
+const slotSel   = document.getElementById('slotSel');
+function loadSlots() {
+  const did = doctorSel.value, dt = apptDate.value;
+  if (!did || !dt) return;
+  fetch(`/opd/slots?doctor_id=${did}&date=${dt}`)
+    .then(r => r.json())
+    .then(slots => {
+      slotSel.innerHTML = '<option value="">-- Select Slot --</option>';
+      slots.forEach(s => {
+        const opt = document.createElement('option');
+        opt.value = s.time;
+        opt.textContent = s.time + (s.available ? '' : ' (Booked)');
+        opt.disabled = !s.available;
+        slotSel.appendChild(opt);
+      });
+    });
+}
+doctorSel.addEventListener('change', loadSlots);
+apptDate.addEventListener('change', loadSlots);
+</script>
+{% endblock %}

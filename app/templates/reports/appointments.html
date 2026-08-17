@@ -1,0 +1,61 @@
+{% extends "shared/base.html" %}
+{% block title %}Appointment Report{% endblock %}
+{% block subnav %}
+<div class="mc-subnav">
+  <a href="{{ url_for('reports.index') }}" class="mc-subnav-item"><i class="bi bi-arrow-left me-1"></i>Reports</a>
+  {% for sid, slabel in [('patients','Patients Appointment'),('doctors','Doctors Appointment'),
+     ('report_type','Appointment Report Type'),('type','Appointment Type Report')] %}
+  <a href="{{ url_for('reports.appointments', sub=sid, date_from=date_from, date_to=date_to) }}"
+     class="mc-subnav-item {% if sub==sid %}active{% endif %}">{{ slabel }}</a>
+  {% endfor %}
+</div>
+{% endblock %}
+{% block content %}
+{% set report_type = 'appointments' %}
+<div class="mc-page-header">
+  <h1 class="mc-page-title"><i class="bi bi-calendar-check"></i> Appointment Report — {{ sub|replace('_',' ')|title }}</h1>
+</div>
+{% include 'reports/_report_header.html' %}
+<div class="mc-card">
+  <div class="mc-card-header"><i class="bi bi-table"></i> Data <span class="badge bg-primary ms-2">{{ data|length }}</span></div>
+  <div class="mc-card-body p-0">
+    <div class="mc-table-wrap">
+      {% if sub == 'doctors' %}
+      <table class="mc-table mc-datatable">
+        <thead><tr><th>Doctor</th><th>Specialisation</th><th>Total Appointments</th></tr></thead>
+        <tbody>
+          {% for row in data %}
+          <tr><td class="fw-semibold">{{ row.full_name }}</td><td class="small text-muted">{{ row.specialisation or '—' }}</td><td class="fw-bold">{{ row.total }}</td></tr>
+          {% else %}<tr><td colspan="3" class="text-center text-muted py-4">No data.</td></tr>{% endfor %}
+        </tbody>
+      </table>
+      {% elif sub == 'type' %}
+      <table class="mc-table mc-datatable">
+        <thead><tr><th>Visit Type</th><th>Count</th></tr></thead>
+        <tbody>
+          {% for row in data %}<tr><td class="fw-semibold">{{ row.visit_type|title }}</td><td>{{ row.total }}</td></tr>
+          {% else %}<tr><td colspan="2" class="text-center text-muted py-4">No data.</td></tr>{% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <table class="mc-table mc-datatable">
+        <thead><tr><th>Date</th><th>Token</th><th>Patient</th><th>UHID</th><th>Doctor</th><th>Visit Type</th><th>Status</th></tr></thead>
+        <tbody>
+          {% for a in data %}
+          <tr>
+            <td class="small">{{ a.appointment_date.strftime('%d-%m-%Y') }}</td>
+            <td><div class="mc-token">{{ a.token_number or '—' }}</div></td>
+            <td class="fw-semibold">{{ a.patient.full_name if a.patient else '—' }}</td>
+            <td><span class="mc-uhid">{{ a.patient.uhid if a.patient else '—' }}</span></td>
+            <td class="small">{{ a.doctor.full_name if a.doctor else '—' }}</td>
+            <td><span class="mc-badge mc-badge-new">{{ a.visit_type|title }}</span></td>
+            <td><span class="mc-badge mc-badge-{% if a.status=='completed' %}done{% elif a.status=='cancelled' %}cancelled{% else %}booked{% endif %}">{{ a.status|replace('_',' ')|title }}</span></td>
+          </tr>
+          {% else %}<tr><td colspan="7" class="text-center text-muted py-4">No appointments found.</td></tr>{% endfor %}
+        </tbody>
+      </table>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

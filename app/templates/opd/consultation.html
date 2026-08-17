@@ -1,0 +1,1228 @@
+{% extends "shared/base.html" %}
+{% block title %}Consultation — {{ patient.full_name }}{% endblock %}
+
+{% block subnav %}
+<div class="mc-subnav" style="background:#f5f0ff;border-bottom:2px solid #e9d5ff">
+  <button type="button" class="mc-subnav-item active" onclick="switchMainTab('prescription')" id="main-btn-prescription"
+          style="color:#3d1a78;border-bottom-color:#3d1a78">
+    <i class="bi bi-clipboard2-pulse me-1"></i>Prescription
+  </button>
+  <button type="button" class="mc-subnav-item" onclick="switchMainTab('result')" id="main-btn-result">Result</button>
+  <button type="button" class="mc-subnav-item" onclick="switchMainTab('diet')" id="main-btn-diet">Diet</button>
+  <button type="button" class="mc-subnav-item" onclick="switchMainTab('rxconfig')" id="main-btn-rxconfig">Rx Configuration</button>
+  <button type="button" class="mc-subnav-item" onclick="switchMainTab('druglibrary')" id="main-btn-druglibrary">Drug Library</button>
+  <div class="ms-auto d-flex gap-2 pe-2 align-items-center">
+    <span class="text-muted small">{{ appt.appointment_date.strftime('%d-%b-%Y') }}</span>
+    <span class="mc-uhid" style="background:#ede9fe;color:#5b21b6">Token #{{ appt.token_number }}</span>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+
+<!-- Allergy Alert -->
+{% if allergies %}
+<div style="background:#fff1f2;border:1px solid #fecdd3;border-radius:6px;padding:8px 14px;
+            display:flex;align-items:center;gap:10px;margin-bottom:10px;font-size:.83rem;color:#991b1b">
+  <i class="bi bi-exclamation-triangle-fill"></i>
+  <strong>ALLERGY ALERT:</strong>
+  {% for a in allergies %}
+  <span class="badge bg-danger ms-1">{{ a.allergen }} ({{ a.severity }})</span>
+  {% endfor %}
+</div>
+{% endif %}
+
+<form method="POST" action="{{ url_for('opd.consultation', appt_id=appt.id) }}" id="consultForm">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+<!-- ═══════════ MAIN TAB: PRESCRIPTION ═══════════ -->
+<div id="main-prescription" class="main-tab">
+<div class="row g-2">
+
+  <!-- ── Left 9 cols: Patient strip + inner tabs ── -->
+  <div class="col-lg-9">
+
+    <!-- Patient Header Strip (PDF page 1 right side) -->
+    <div class="mc-card mb-2" style="border:1px solid #e9d5ff">
+      <div class="mc-card-body py-2 px-3" style="background:linear-gradient(90deg,#f5f0ff 0%,#fff 100%)">
+        <div class="row align-items-center g-2">
+          <div class="col-auto">
+            <div style="width:42px;height:42px;border-radius:50%;background:#ede9fe;
+                        display:flex;align-items:center;justify-content:center">
+              <i class="bi bi-person" style="color:#5b21b6;font-size:1.2rem"></i>
+            </div>
+          </div>
+          <div class="col">
+            <div class="fw-bold" style="font-size:.95rem">
+              {{ patient.full_name }}
+              <span class="mc-uhid ms-2" style="background:#ede9fe;color:#5b21b6">{{ patient.uhid }}</span>
+              <span class="ms-2 small text-muted">
+                {{ patient.age_years or '' }}{% if patient.age_years %}y{% endif %}
+                {% if patient.gender %} / {{ patient.gender[0] }}{% endif %}
+              </span>
+              {% if patient.blood_group %}
+              <span class="badge ms-1" style="background:#fef3c7;color:#92400e">{{ patient.blood_group }}</span>
+              {% endif %}
+            </div>
+            <div class="text-muted small">
+              <i class="bi bi-telephone me-1"></i>{{ patient.phone }}
+              {% if patient.abha_number %}&nbsp;|&nbsp;<i class="bi bi-credit-card me-1"></i>ABHA: {{ patient.abha_number }}{% endif %}
+            </div>
+          </div>
+          <div class="col-auto text-end small">
+            <div class="fw-semibold" style="color:#3d1a78">{{ doctor.title }} {{ doctor.full_name }}</div>
+            <div class="text-muted" style="font-size:.7rem">{{ doctor.qualification or '' }}</div>
+            <div class="text-muted" style="font-size:.7rem">Reg: {{ doctor.reg_number or '—' }}</div>
+            <div class="text-muted" style="font-size:.7rem">{{ appt.appointment_date.strftime('%d %b %Y') }}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Inner Tab Bar (PDF page 2 horizontal) -->
+    <div style="border:1px solid #e9d5ff;border-radius:8px;overflow:hidden;background:#fff">
+      <div style="display:flex;overflow-x:auto;background:#f5f0ff;border-bottom:1px solid #e9d5ff;scrollbar-width:none">
+        {% for itid, itlbl in [
+          ('old-visit','Old Visit'),('vitals','Vitals'),
+          ('patient-history','Patient History'),('medicine','Medicine'),
+          ('lab-inv','Lab Investigation'),('scan','Scan'),
+          ('surgery','Surgery'),('notes','Notes')
+        ] %}
+        <button type="button"
+                onclick="switchInnerTab('{{ itid }}')"
+                id="inner-btn-{{ itid }}"
+                style="flex-shrink:0;padding:9px 14px;border:none;background:transparent;
+                       font-size:.78rem;font-weight:500;color:#6b7280;cursor:pointer;
+                       white-space:nowrap;border-bottom:2px solid transparent;
+                       transition:all .15s;outline:none"
+                onmouseover="if(this.style.borderBottomColor!='rgb(61, 26, 120)')this.style.color='#5b21b6'"
+                onmouseout="if(this.style.borderBottomColor!='rgb(61, 26, 120)')this.style.color='#6b7280'">
+          {{ itlbl }}
+        </button>
+        {% endfor %}
+      </div>
+
+      <!-- ╔══ OLD VISIT ══╗ -->
+      <div id="inner-old-visit" class="inner-tab p-3">
+        <div class="row g-3">
+          <div class="col-md-6">
+            <div class="fw-semibold small mb-2" style="color:#5b21b6">
+              <i class="bi bi-file-text me-1"></i>Current Visit Summary
+            </div>
+            <div style="border:1px solid #e9d5ff;border-radius:6px;padding:12px;min-height:120px;font-size:.82rem;background:#fafafe">
+              {% if consult and consult.chief_complaint %}
+              <div class="mb-1"><strong>CC:</strong> {{ consult.chief_complaint }}</div>
+              {% endif %}
+              {% if consult and consult.diagnosis %}
+              <div class="mb-1"><strong>Dx:</strong> {{ consult.diagnosis }}</div>
+              {% endif %}
+              {% if not consult or (not consult.chief_complaint and not consult.diagnosis) %}
+              <p class="text-muted mb-0">Fill in other tabs — summary will appear here.</p>
+              {% endif %}
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="fw-semibold small mb-2" style="color:#5b21b6">
+              <i class="bi bi-clock-history me-1"></i>Previous Visit Notes
+            </div>
+            <div style="border:1px solid #e9d5ff;border-radius:6px;overflow-y:auto;max-height:200px">
+              {% for pc in prev_consults %}
+              <div style="padding:10px 12px;border-bottom:1px solid #f3e8ff;font-size:.78rem">
+                <div class="d-flex justify-content-between mb-1">
+                  <span class="fw-semibold" style="color:#3d1a78">
+                    {{ pc.appointment.appointment_date.strftime('%d %b %Y') if pc.appointment else '—' }}
+                  </span>
+                  <span class="text-muted">{{ pc.appointment.visit_type|title if pc.appointment else '' }}</span>
+                </div>
+                {% if pc.chief_complaint %}<div class="text-muted"><strong>CC:</strong> {{ pc.chief_complaint[:100] }}</div>{% endif %}
+                {% if pc.diagnosis %}<div class="text-muted"><strong>Dx:</strong> {{ pc.diagnosis[:100] }}</div>{% endif %}
+              </div>
+              {% else %}
+              <div style="padding:20px;text-align:center;color:#9ca3af;font-size:.8rem">No previous consultations.</div>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ╔══ VITALS ══╗ (PDF page 2) -->
+      <div id="inner-vitals" class="inner-tab p-3" style="display:none">
+        <div class="row g-2 mb-3">
+          <!-- BP with arm selector -->
+          <div class="col-6 col-md-3">
+            <label class="mc-label">BP (mmHg)</label>
+            <div class="input-group input-group-sm">
+              <input type="number" name="bp_systolic" class="form-control" placeholder="Sys"
+                     value="{{ consult.bp_systolic or '' }}">
+              <span class="input-group-text">/</span>
+              <input type="number" name="bp_diastolic" class="form-control" placeholder="Dia"
+                     value="{{ consult.bp_diastolic or '' }}">
+            </div>
+            <div class="d-flex gap-2 mt-1">
+              <div class="form-check form-check-inline mb-0">
+                <input class="form-check-input" type="radio" name="bp_arm" value="L" id="arm_l"
+                       {{ 'checked' if not consult or consult.bp_arm == 'L' else '' }}>
+                <label class="form-check-label small" for="arm_l">L.Arm</label>
+              </div>
+              <div class="form-check form-check-inline mb-0">
+                <input class="form-check-input" type="radio" name="bp_arm" value="R" id="arm_r"
+                       {{ 'checked' if consult and consult.bp_arm == 'R' else '' }}>
+                <label class="form-check-label small" for="arm_r">R.Arm</label>
+              </div>
+            </div>
+          </div>
+          <div class="col-6 col-md-2">
+            <label class="mc-label">Pulse (/min)</label>
+            <input type="number" name="pulse_bpm" class="form-control form-control-sm"
+                   value="{{ consult.pulse_bpm or '' }}" placeholder="bpm">
+          </div>
+          <div class="col-6 col-md-2">
+            <label class="mc-label">Weight (kg)</label>
+            <input type="number" step="0.1" name="weight_kg" id="weight_kg" class="form-control form-control-sm"
+                   value="{{ consult.weight_kg or '' }}">
+          </div>
+          <div class="col-6 col-md-2">
+            <label class="mc-label">Height (cms)</label>
+            <input type="number" step="0.1" name="height_cm" id="height_cm" class="form-control form-control-sm"
+                   value="{{ consult.height_cm or '' }}">
+          </div>
+          <div class="col-6 col-md-1">
+            <label class="mc-label">BMI</label>
+            <input type="number" step="0.01" name="bmi" id="bmi" class="form-control form-control-sm"
+                   value="{{ consult.bmi or '' }}" readonly style="background:#f5f0ff">
+          </div>
+          <div class="col-6 col-md-2">
+            <label class="mc-label">Heart Rate (bpm)</label>
+            <input type="number" name="heart_rate" class="form-control form-control-sm"
+                   value="{{ consult.heart_rate_bpm or '' }}">
+          </div>
+          <div class="col-6 col-md-2">
+            <label class="mc-label">Temperature (°C)</label>
+            <input type="number" step="0.1" name="temp_celsius" class="form-control form-control-sm"
+                   value="{{ consult.temp_celsius or '' }}">
+          </div>
+          <div class="col-6 col-md-2">
+            <label class="mc-label">SpO2 (%)</label>
+            <input type="number" name="spo2_percent" class="form-control form-control-sm" max="100"
+                   value="{{ consult.spo2_percent or '' }}">
+          </div>
+          <div class="col-6 col-md-2">
+            <label class="mc-label">CBG (mg/dL)</label>
+            <input type="number" step="0.1" name="cbg" class="form-control form-control-sm"
+                   value="{{ consult.cbg_mg_dl or '' }}">
+          </div>
+          <div class="col-6 col-md-2">
+            <label class="mc-label">Blood Group</label>
+            <select name="blood_group_vitals" class="form-select form-select-sm">
+              <option value="">—</option>
+              {% for bg in ['A+','A-','B+','B-','AB+','AB-','O+','O-'] %}
+              <option {% if consult and consult.blood_group == bg %}selected{% endif %}>{{ bg }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+
+        <!-- Attach Documents row -->
+        <div class="d-flex gap-2 align-items-center flex-wrap mt-2">
+          <button type="button" class="btn btn-sm btn-outline-secondary">
+            <i class="bi bi-paperclip me-1"></i>Attach Documents
+          </button>
+          <span class="text-muted small">Uploaded documents view</span>
+          {% if prev_vitals %}
+          <div class="ms-auto small" style="background:#f5f0ff;padding:6px 12px;border-radius:6px">
+            <strong style="color:#5b21b6">Prev ({{ prev_vitals.appointment.appointment_date.strftime('%d %b') if prev_vitals.appointment else '—' }}):</strong>
+            {% if prev_vitals.bp_systolic %}BP {{ prev_vitals.bp_systolic }}/{{ prev_vitals.bp_diastolic }}{% endif %}
+            {% if prev_vitals.weight_kg %} | Wt {{ prev_vitals.weight_kg }}kg{% endif %}
+            <button type="button" class="btn btn-sm ms-2" style="font-size:.65rem;padding:2px 8px;background:#5b21b6;color:#fff;border:none;border-radius:4px"
+                    onclick="copyPrevVitals({{ prev_vitals.bp_systolic or 'null' }},{{ prev_vitals.bp_diastolic or 'null' }},{{ prev_vitals.weight_kg or 'null' }},{{ prev_vitals.height_cm or 'null' }})">
+              Copy
+            </button>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- ╔══ PATIENT HISTORY ══╗ (PDF page 3 — 3-column grid) -->
+      <div id="inner-patient-history" class="inner-tab p-3" style="display:none">
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
+          {% set hist_sections = [
+            ('chief-comp','Chief Complaints',      'cc',   ['Acute','Chronic','Recurring'],         'cc_type[]','cc_desc[]'),
+            ('past-med',  'Past Medical/Surgical', 'pm',   ['Medical','Surgical','Both'],            'pm_type[]','pm_desc[]'),
+            ('drug-hist', 'Drug History',          'dh',   ['Current Med','Allergy','Adverse Rxn'], 'dh_type[]','dh_desc[]'),
+            ('past-inv',  'Past Investigation',    'pi',   ['Lab','Scan','ECG','Biopsy','Other'],   'pi_type[]','pi_desc[]'),
+            ('dev-hist',  'Development History',   'dev',  ['Motor','Speech','Social','Cognitive'],  'dev_type[]','dev_desc[]'),
+            ('cross-con', 'Cross Consult Reports', 'cc2',  ['Internal','External','Tele-consult'],   'cc2_type[]','cc2_desc[]'),
+            ('physio',    'Physiotherapy',         'ph',   ['Current','Past','Recommended'],         'ph_type[]','ph_desc[]'),
+            ('birth-hist','Birth History',         'bh',   ['Normal','LSCS','Premature','IVF'],      'bh_type[]','bh_desc[]'),
+            ('nutrition', 'Nutrition History',     'nh',   ['Veg','Non-Veg','Vegan','Mixed'],        'nh_type[]','nh_desc[]'),
+            ('others',    'Others',                'oh',   ['Social','Occupational','Travel','Other'],'oh_type[]','oh_desc[]'),
+            ('immuniz',   'Immunization Report',   'imm',  ['Routine','Special','Booster'],          'imm_type[]','imm_desc[]'),
+            ('exam',      'Examination',           'ex',   ['General','CVS','RS','CNS','GIT','MSK'], 'ex_type[]','ex_desc[]'),
+          ] %}
+          {% for hid, hlbl, hpfx, htypes, htype_name, hdesc_name in hist_sections %}
+          <div style="border:1px solid #e9d5ff;border-radius:8px;overflow:hidden">
+            <div style="background:#f5f0ff;padding:7px 10px;font-size:.75rem;font-weight:700;
+                        color:#3d1a78;display:flex;justify-content:space-between;align-items:center">
+              {{ hlbl }}
+              <button type="button" class="btn btn-sm" onclick="addHistRow('{{ hid }}-body','{{ htype_name }}','{{ hdesc_name }}',{{ htypes|tojson }})"
+                      style="width:22px;height:22px;padding:0;background:#3d1a78;color:#fff;border:none;border-radius:50%;font-size:.9rem;line-height:1">+</button>
+            </div>
+            <div id="{{ hid }}-body" style="padding:6px;min-height:60px">
+              <!-- Existing entries -->
+              {% if consult %}
+              {% if hid == 'chief-comp' %}
+              {% for entry in hist_data.get('chief_complaints', []) %}
+              <div class="hist-entry-row d-flex gap-1 mb-1">
+                <select name="cc_type[]" class="form-select form-select-sm" style="width:90px;font-size:.7rem">
+                  {% for t in ['Acute','Chronic','Recurring'] %}<option {% if entry.entry_type==t %}selected{% endif %}>{{ t }}</option>{% endfor %}
+                </select>
+                <input type="text" name="cc_desc[]" class="form-control form-control-sm" style="font-size:.72rem" value="{{ entry.description }}">
+                <button type="button" onclick="this.closest('.hist-entry-row').remove()" class="btn btn-sm btn-outline-danger" style="padding:2px 6px;font-size:.7rem">×</button>
+              </div>
+              {% endfor %}
+              {% elif hid == 'past-med' %}
+              {% for entry in hist_data.get('past_medical', []) %}
+              <div class="hist-entry-row d-flex gap-1 mb-1">
+                <select name="pm_type[]" class="form-select form-select-sm" style="width:90px;font-size:.7rem">
+                  {% for t in ['Medical','Surgical','Both'] %}<option {% if entry.entry_type==t %}selected{% endif %}>{{ t }}</option>{% endfor %}
+                </select>
+                <input type="text" name="pm_desc[]" class="form-control form-control-sm" style="font-size:.72rem" value="{{ entry.description }}">
+                <button type="button" onclick="this.closest('.hist-entry-row').remove()" class="btn btn-sm btn-outline-danger" style="padding:2px 6px;font-size:.7rem">×</button>
+              </div>
+              {% endfor %}
+              {% elif hid == 'drug-hist' %}
+              {% for entry in hist_data.get('drug_history', []) %}
+              <div class="hist-entry-row d-flex gap-1 mb-1">
+                <select name="dh_type[]" class="form-select form-select-sm" style="width:100px;font-size:.7rem">
+                  {% for t in ['Current Med','Allergy','Adverse Rxn'] %}<option {% if entry.entry_type==t %}selected{% endif %}>{{ t }}</option>{% endfor %}
+                </select>
+                <input type="text" name="dh_drug[]" class="form-control form-control-sm" style="font-size:.72rem" value="{{ entry.drug_name or '' }}" placeholder="Drug name">
+                <input type="text" name="dh_desc[]" class="form-control form-control-sm" style="font-size:.72rem" value="{{ entry.description or '' }}" placeholder="Details">
+                <button type="button" onclick="this.closest('.hist-entry-row').remove()" class="btn btn-sm btn-outline-danger" style="padding:2px 6px;font-size:.7rem">×</button>
+              </div>
+              {% endfor %}
+              {% elif hid == 'immuniz' %}
+              {% for entry in hist_data.get('immunization', []) %}
+              <div class="hist-entry-row d-flex gap-1 mb-1">
+                <input type="text" name="imm_vaccine[]" class="form-control form-control-sm" style="font-size:.72rem" value="{{ entry.vaccine_name or '' }}" placeholder="Vaccine">
+                <input type="date" name="imm_date[]" class="form-control form-control-sm" style="font-size:.72rem;width:110px" value="{{ entry.given_date.isoformat() if entry.given_date else '' }}">
+                <button type="button" onclick="this.closest('.hist-entry-row').remove()" class="btn btn-sm btn-outline-danger" style="padding:2px 6px;font-size:.7rem">×</button>
+              </div>
+              {% endfor %}
+              {% elif hid == 'exam' %}
+              {% for entry in hist_data.get('examination', []) %}
+              <div class="hist-entry-row d-flex gap-1 mb-1">
+                <select name="ex_system[]" class="form-select form-select-sm" style="width:80px;font-size:.7rem">
+                  {% for t in ['CVS','RS','CNS','GIT','MSK','General'] %}<option {% if entry.system==t %}selected{% endif %}>{{ t }}</option>{% endfor %}
+                </select>
+                <input type="text" name="ex_desc[]" class="form-control form-control-sm" style="font-size:.72rem" value="{{ entry.description }}">
+                <button type="button" onclick="this.closest('.hist-entry-row').remove()" class="btn btn-sm btn-outline-danger" style="padding:2px 6px;font-size:.7rem">×</button>
+              </div>
+              {% endfor %}
+              {% endif %}
+              {% endif %}
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        <button type="button" class="btn btn-sm mt-3" style="background:#5b21b6;color:#fff;border:none">
+          <i class="bi bi-floppy me-1"></i>Save History
+        </button>
+      </div>
+
+      <!-- ╔══ MEDICINE ══╗ (PDF pages 4-5) -->
+      <div id="inner-medicine" class="inner-tab p-2" style="display:none">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <span style="font-size:.82rem;font-weight:700;color:#3d1a78">
+            <i class="bi bi-capsule me-1"></i>Medicines / Treatment
+          </span>
+          <button type="button" onclick="addMedicineRow()" class="btn btn-sm" style="background:#3d1a78;color:#fff;border:none">
+            <i class="bi bi-plus-circle me-1"></i>Add Medicine
+          </button>
+        </div>
+        <div style="overflow-x:auto">
+          <table style="width:100%;border-collapse:collapse;font-size:.76rem;min-width:900px" id="rxTable">
+            <thead>
+              <tr style="background:#f5f0ff;border-bottom:2px solid #e9d5ff">
+                <th style="padding:7px 8px;border:1px solid #e9d5ff;min-width:160px">Generic Name / Brand</th>
+                <th style="padding:7px 8px;border:1px solid #e9d5ff;width:75px">Dosage</th>
+                <th style="padding:7px 8px;border:1px solid #e9d5ff;width:70px">Route</th>
+                <th style="padding:7px 8px;border:1px solid #e9d5ff;width:90px;text-align:center">Morning<br><small style="font-size:.6rem;color:#6b7280">Qty / BF-AF</small></th>
+                <th style="padding:7px 8px;border:1px solid #e9d5ff;width:90px;text-align:center">Afternoon<br><small style="font-size:.6rem;color:#6b7280">Qty / BF-AF</small></th>
+                <th style="padding:7px 8px;border:1px solid #e9d5ff;width:90px;text-align:center">Night<br><small style="font-size:.6rem;color:#6b7280">Qty / BF-AF</small></th>
+                <th style="padding:7px 8px;border:1px solid #e9d5ff;width:55px">Days</th>
+                <th style="padding:7px 8px;border:1px solid #e9d5ff;width:50px">Qty</th>
+                <th style="padding:7px 8px;border:1px solid #e9d5ff;width:100px">Instructions</th>
+                <th style="padding:7px 8px;border:1px solid #e9d5ff;width:70px">Lang</th>
+                <th style="padding:7px 8px;border:1px solid #e9d5ff;width:60px"></th>
+              </tr>
+            </thead>
+            <tbody id="rxBody">
+              {% for item in rx_items %}
+              <tr class="rx-row">
+                <td style="border:1px solid #f3e8ff;padding:4px;position:relative">
+                  <input type="text" name="drug_name[]" class="form-control form-control-sm drug-input"
+                         value="{{ item.drug_name }}" placeholder="Drug name" required>
+                  <div class="drug-check-badge" style="font-size:.62rem;margin-top:2px"></div>
+                </td>
+                <td style="border:1px solid #f3e8ff;padding:4px">
+                  <input type="text" name="dosage[]" class="form-control form-control-sm"
+                         value="{{ item.dosage or '' }}" placeholder="500mg">
+                </td>
+                <td style="border:1px solid #f3e8ff;padding:4px">
+                  <select name="route[]" class="form-select form-select-sm">
+                    {% for r in ['Oral','IV','IM','SC','Topical','Inhaler','Drops'] %}
+                    <option {% if item.route==r %}selected{% endif %}>{{ r }}</option>
+                    {% endfor %}
+                  </select>
+                </td>
+                {% for period, qty_name, timing_name, qty_val, timing_val in [
+                  ('mor','mor[]','mor_timing[]', item.mor_qty, item.mor_timing),
+                  ('act','act[]','act_timing[]', item.act_qty, item.act_timing),
+                  ('night','night[]','night_timing[]', item.night_qty, item.night_timing)
+                ] %}
+                <td style="border:1px solid #f3e8ff;padding:4px;text-align:center">
+                  <input type="number" step="0.5" name="{{ qty_name }}" class="form-control form-control-sm text-center"
+                         value="{{ qty_val or '' }}" placeholder="0" style="width:45px;display:inline-block">
+                  <select name="{{ timing_name }}" class="form-select form-select-sm mt-1" style="width:52px;font-size:.62rem">
+                    <option value="BF" {% if timing_val=='BF' %}selected{% endif %}>B/F</option>
+                    <option value="AF" {% if timing_val=='AF' or not timing_val %}selected{% endif %}>A/F</option>
+                  </select>
+                </td>
+                {% endfor %}
+                <td style="border:1px solid #f3e8ff;padding:4px">
+                  <input type="number" name="duration_days[]" class="form-control form-control-sm"
+                         value="{{ item.duration_days or '' }}" placeholder="Days">
+                </td>
+                <td style="border:1px solid #f3e8ff;padding:4px">
+                  <input type="number" name="quantity[]" class="form-control form-control-sm"
+                         value="{{ item.quantity or '' }}">
+                </td>
+                <td style="border:1px solid #f3e8ff;padding:4px">
+                  <input type="text" name="instructions[]" class="form-control form-control-sm"
+                         value="{{ item.instructions or '' }}" placeholder="After food">
+                </td>
+                <td style="border:1px solid #f3e8ff;padding:4px">
+                  <select name="rx_lang[]" class="form-select form-select-sm" style="font-size:.65rem">
+                    <option value="en" {% if item.rx_language=='en' %}selected{% endif %}>English</option>
+                    <option value="ta" {% if item.rx_language=='ta' %}selected{% endif %}>Tamil</option>
+                    <option value="hi" {% if item.rx_language=='hi' %}selected{% endif %}>Hindi</option>
+                  </select>
+                </td>
+                <td style="border:1px solid #f3e8ff;padding:4px;text-align:center">
+                  <button type="button" class="btn btn-sm highlight-btn {% if item.is_highlighted %}btn-warning{% else %}btn-outline-warning{% endif %}"
+                          style="width:26px;height:26px;padding:0" title="Highlight">
+                    <i class="bi bi-star{% if item.is_highlighted %}-fill{% endif %}" style="font-size:.72rem"></i>
+                  </button>
+                  <button type="button" class="btn btn-sm btn-outline-danger remove-rx mt-1"
+                          style="width:26px;height:26px;padding:0">
+                    <i class="bi bi-trash" style="font-size:.72rem"></i>
+                  </button>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <div class="mt-2 small" style="color:#6b7280">
+          <i class="bi bi-info-circle me-1"></i>
+          ⭐ Highlighted = priority medicine (prints first).
+          <span id="generic-check-global" class="ms-2"></span>
+        </div>
+
+        <!-- Advice / Remarks / Next Review / Tests (bottom of Medicine tab per PDF) -->
+        <div class="row g-2 mt-3">
+          <div class="col-md-6">
+            <label class="mc-label">Advice</label>
+            <textarea name="advice" class="form-control form-control-sm" rows="2"
+                      placeholder="Patient advice…">{{ consult.advice or '' }}</textarea>
+          </div>
+          <div class="col-md-6">
+            <label class="mc-label">Remarks</label>
+            <textarea name="special_advice" class="form-control form-control-sm" rows="2"
+                      placeholder="Remarks…">{{ consult.special_advice or '' }}</textarea>
+          </div>
+          <div class="col-md-4">
+            <label class="mc-label">Next Review</label>
+            <div class="input-group input-group-sm">
+              <input type="number" name="follow_up_days" class="form-control" placeholder="Days"
+                     value="{{ consult.follow_up_days or '' }}">
+              <input type="date" name="next_review_date" class="form-control"
+                     value="{{ consult.follow_up_date.isoformat() if consult and consult.follow_up_date else '' }}">
+            </div>
+          </div>
+          <div class="col-md-8">
+            <label class="mc-label">Tests taken for next visit</label>
+            <input type="text" name="test_request" class="form-control form-control-sm"
+                   value="{{ consult.test_request or '' }}" placeholder="Tests to be done on next visit">
+          </div>
+        </div>
+      </div>
+
+      <!-- ╔══ LAB INVESTIGATION ══╗ (PDF page 5) -->
+      <div id="inner-lab-inv" class="inner-tab p-3" style="display:none">
+        <div class="fw-semibold small mb-2" style="color:#3d1a78">Test Configuration</div>
+        <div class="d-flex flex-wrap gap-2 mb-3 p-2" style="background:#f5f0ff;border-radius:6px">
+          {% for tname in ['CBC','LFT','RFT','RA Factor','Electrolytes','HbA1c','Lipid Profile',
+                           'Thyroid Function','Blood Sugar (F/PP)','Urine Routine','Stool Routine',
+                           'ESR','CRP','Uric Acid','Vitamin D','Vitamin B12','ECG','PT/INR'] %}
+          <div class="form-check" style="min-width:130px">
+            <input class="form-check-input" type="checkbox" name="ordered_tests[]"
+                   value="{{ tname }}" id="t_{{ loop.index }}"
+                   {% if consult and consult.lab_ordered_tests and tname in consult.lab_ordered_tests %}checked{% endif %}>
+            <label class="form-check-label small" for="t_{{ loop.index }}">{{ tname }}</label>
+          </div>
+          {% endfor %}
+        </div>
+
+        <!-- Add custom test -->
+        <div id="custom-tests-area" class="mb-3"></div>
+        <button type="button" onclick="addCustomTest()" class="btn btn-sm btn-outline-secondary mb-3">
+          <i class="bi bi-plus-circle me-1"></i>Add Custom Test
+        </button>
+
+        <div class="row g-2 mb-3">
+          <div class="col-md-3">
+            <label class="mc-label">Sample Collection Date</label>
+            <input type="date" name="lab_collection_date" class="form-control form-control-sm"
+                   value="{{ consult.lab_collection_date.isoformat() if consult and consult.lab_collection_date else today.isoformat() }}">
+          </div>
+          <div class="col-md-3">
+            <label class="mc-label">Sample Type</label>
+            <select name="lab_sample_type" class="form-select form-select-sm">
+              {% for st in ['Blood','Urine','Stool','Swab','Sputum','CSF','Other'] %}
+              <option {% if consult and consult.lab_sample_type==st.lower() %}selected{% endif %}
+                      value="{{ st.lower() }}">{{ st }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-3">
+            <label class="mc-label">Collection Type</label>
+            <div class="d-flex gap-3 mt-1">
+              <div class="form-check">
+                <input class="form-check-input" type="radio" name="lab_fasting" value="fasting"
+                       {% if consult and consult.lab_fasting=='fasting' %}checked{% endif %} id="r_fast">
+                <label class="form-check-label small" for="r_fast">Fasting</label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input" type="radio" name="lab_fasting" value="non_fasting"
+                       {% if not consult or consult.lab_fasting != 'fasting' %}checked{% endif %} id="r_nonfast">
+                <label class="form-check-label small" for="r_nonfast">Non-Fasting</label>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <label class="mc-label">Special Instructions</label>
+            <input type="text" name="lab_special_instructions" class="form-control form-control-sm"
+                   value="{{ consult.lab_special_instructions or '' }}" placeholder="e.g. 8hr fasting required">
+          </div>
+        </div>
+
+        <!-- Previous Results panel (PDF page 5 left side) -->
+        <div class="mc-card">
+          <div class="mc-card-header" style="background:#f5f0ff;font-size:.82rem">
+            <i class="bi bi-clipboard-data" style="color:#5b21b6"></i>
+            <span style="color:#3d1a78">Previous Results</span>
+          </div>
+          <div class="mc-card-body">
+            <div class="d-flex gap-2 mb-2 flex-wrap">
+              <button type="button" class="btn btn-sm btn-outline-primary" style="font-size:.72rem">LFT</button>
+              <button type="button" class="btn btn-sm btn-outline-primary" style="font-size:.72rem">BFT</button>
+              <button type="button" class="btn btn-sm btn-outline-primary" style="font-size:.72rem">RA Factor</button>
+            </div>
+            <textarea name="lab_findings" class="form-control form-control-sm" rows="3"
+                      placeholder="Previous lab findings will appear here when patient has prior results…"></textarea>
+            <div class="mt-2 d-flex gap-2">
+              <button type="button" class="btn btn-sm" style="background:#5b21b6;color:#fff;border:none;font-size:.75rem">
+                <i class="bi bi-eye me-1"></i>View Result
+              </button>
+              <button type="button" class="btn btn-sm btn-outline-secondary" style="font-size:.75rem">Add Field</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ╔══ SCAN ══╗ (PDF page 6) -->
+      <div id="inner-scan" class="inner-tab p-3" style="display:none">
+        <div class="row g-2 mb-3">
+          <div class="col-md-3">
+            <label class="mc-label">Collection Date</label>
+            <input type="date" name="scan_collection_date" class="form-control form-control-sm"
+                   value="{{ consult.scan_collection_date.isoformat() if consult and consult.scan_collection_date else today.isoformat() }}">
+          </div>
+          <div class="col-md-5">
+            <label class="mc-label">Organisation / External Centre</label>
+            <input type="text" name="scan_organisation" class="form-control form-control-sm"
+                   value="{{ consult.scan_organisation or '' }}" placeholder="e.g. Apollo Radiology, Thiruporur">
+          </div>
+        </div>
+        <div class="row g-3">
+          {% for scan_key, scan_lbl, scan_icon in [
+            ('xray','X-Ray','camera'),('usg','USG','activity'),
+            ('mri','MRI','magnet'),('ct','CT','circle-square')
+          ] %}
+          {% set s_ord   = 'consult.scan_' + scan_key + '_ordered'   %}
+          {% set s_organ = 'consult.scan_' + scan_key + '_organ'     %}
+          {% set s_pos   = 'consult.scan_' + scan_key + '_position'  %}
+          {% set s_desc  = 'consult.scan_' + scan_key + '_desc'      %}
+          {% set s_cfg   = 'consult.scan_' + scan_key + '_config'    %}
+          <div class="col-md-3">
+            <div style="border:1px solid #e9d5ff;border-radius:8px;overflow:hidden">
+              <div style="background:#f5f0ff;padding:8px 10px;display:flex;justify-content:space-between;align-items:center">
+                <span style="font-size:.8rem;font-weight:700;color:#3d1a78">
+                  <i class="bi bi-{{ scan_icon }} me-1"></i>{{ scan_lbl }}
+                </span>
+                <div class="form-check mb-0">
+                  <input class="form-check-input" type="checkbox" name="scan_{{ scan_key }}"
+                         value="1" id="scan_{{ scan_key }}"
+                         {% if consult and consult['scan_' + scan_key + '_ordered'] %}checked{% endif %}>
+                  <label class="form-check-label small" for="scan_{{ scan_key }}">Order</label>
+                </div>
+              </div>
+              <div style="padding:8px">
+                <label class="mc-label">Organ / Body Part</label>
+                <input type="text" name="scan_{{ scan_key }}_organ" class="form-control form-control-sm mb-1"
+                       value="{{ consult['scan_' + scan_key + '_organ'] if consult else '' }}"
+                       placeholder="e.g. Chest, Abdomen, Ankle">
+                <label class="mc-label">Position</label>
+                <input type="text" name="scan_{{ scan_key }}_position" class="form-control form-control-sm mb-1"
+                       value="{{ consult['scan_' + scan_key + '_position'] if consult else '' }}"
+                       placeholder="e.g. PA View, Lateral, AP">
+                <label class="mc-label">Description</label>
+                <textarea name="scan_{{ scan_key }}_desc" class="form-control form-control-sm mb-1" rows="2"
+                          placeholder="Additional instructions…">{{ consult['scan_' + scan_key + '_desc'] if consult else '' }}</textarea>
+                <label class="mc-label">Test Configuration</label>
+                <input type="text" name="scan_{{ scan_key }}_config" class="form-control form-control-sm"
+                       value="{{ consult['scan_' + scan_key + '_config'] if consult else '' }}"
+                       placeholder="With contrast / Without contrast">
+              </div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        <div class="mt-3 d-flex gap-2">
+          <button type="button" class="btn btn-sm btn-outline-secondary"><i class="bi bi-floppy me-1"></i>Save</button>
+          <button type="button" class="btn btn-sm btn-outline-secondary"><i class="bi bi-pencil me-1"></i>Edit</button>
+        </div>
+      </div>
+
+      <!-- ╔══ SURGERY ══╗ (PDF page 7) -->
+      <div id="inner-surgery" class="inner-tab p-3" style="display:none">
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="mc-label">Plan</label>
+            <textarea name="surgery_plan" class="form-control" rows="3"
+                      placeholder="Surgery plan…">{{ consult.surgery_plan or '' }}</textarea>
+          </div>
+          <div class="col-md-6">
+            <label class="mc-label">Procedure</label>
+            <input type="text" name="surgery_procedure" class="form-control"
+                   value="{{ consult.surgery_procedure or '' }}" placeholder="Procedure name">
+          </div>
+          <div class="col-md-4">
+            <label class="mc-label">Surgeon</label>
+            <select name="surgeon_id" class="form-select">
+              <option value="">— Select Surgeon —</option>
+              {% for sd in surgical_doctors %}
+              <option value="{{ sd.id }}" {% if consult and consult.surgeon_id == sd.id %}selected{% endif %}>
+                {{ sd.title }} {{ sd.full_name }}{% if sd.specialisation %} ({{ sd.specialisation }}){% endif %}
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="mc-label">Scheduled Date</label>
+            <input type="date" name="surgery_scheduled_date" class="form-control"
+                   value="{{ consult.surgery_scheduled_date.isoformat() if consult and consult.surgery_scheduled_date else '' }}">
+          </div>
+          <div class="col-md-4">
+            <label class="mc-label">Anaesthesia Type</label>
+            <select name="anaesthesia_type" class="form-select">
+              <option value="">—</option>
+              {% for at in ['General (GA)','Spinal','Epidural','Local','Regional','Sedation','Combined'] %}
+              <option {% if consult and consult.anaesthesia_type == at %}selected{% endif %}>{{ at }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="mc-label">Ward / OT</label>
+            <input type="text" name="surgery_ward_ot" class="form-control"
+                   value="{{ consult.surgery_ward_ot or '' }}" placeholder="Ward / OT number">
+          </div>
+          <div class="col-md-8">
+            <label class="mc-label">Pre-op Tests Required</label>
+            <input type="text" name="preop_tests" class="form-control"
+                   value="{{ consult.preop_tests or '' }}"
+                   placeholder="e.g. CBC, ECG, Chest X-Ray, Blood Group & Cross-match">
+          </div>
+          <div class="col-md-6">
+            <label class="mc-label">Surgery Notes / Instructions</label>
+            <textarea name="surgery_notes" class="form-control" rows="3"
+                      placeholder="Pre-operative instructions, consent notes, special requirements…">{{ consult.surgery_notes or '' }}</textarea>
+          </div>
+          <div class="col-md-6">
+            <label class="mc-label">Night Notes (pre-surgery evening)</label>
+            <textarea name="surgery_night_notes" class="form-control" rows="3"
+                      placeholder="Instructions for the night before surgery — NPO from, enema, etc.">{{ consult.surgery_night_notes or '' }}</textarea>
+          </div>
+        </div>
+      </div>
+
+      <!-- ╔══ NOTES ══╗ (PDF page 8) -->
+      <div id="inner-notes" class="inner-tab p-3" style="display:none">
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="mc-label">Visit Notes</label>
+            <textarea name="treatment_plan" class="form-control" rows="8"
+                      placeholder="Current visit notes, clinical findings, treatment response…">{{ consult.treatment_plan or '' }}</textarea>
+          </div>
+          <div class="col-md-6">
+            <div class="fw-semibold small mb-2" style="color:#5b21b6">
+              <i class="bi bi-clock-history me-1"></i>Previous Visit Notes
+            </div>
+            <div style="border:1px solid #e9d5ff;border-radius:6px;overflow-y:auto;max-height:220px">
+              {% for pc in prev_consults %}
+              <div style="padding:10px 12px;border-bottom:1px solid #f3e8ff;font-size:.78rem">
+                <div class="d-flex justify-content-between mb-1">
+                  <span class="fw-semibold" style="color:#3d1a78">
+                    {{ pc.appointment.appointment_date.strftime('%d %b %Y') if pc.appointment else '—' }}
+                  </span>
+                  <span class="text-muted small">{{ pc.appointment.visit_type|title if pc.appointment else '' }}</span>
+                </div>
+                <div class="text-muted">{{ pc.treatment_plan[:200] if pc.treatment_plan else '—' }}</div>
+              </div>
+              {% else %}
+              <div style="padding:20px;text-align:center;color:#9ca3af;font-size:.8rem">
+                <i class="bi bi-journal-x d-block mb-1" style="font-size:1.5rem"></i>
+                No previous visit notes.
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- end inner tab container -->
+  </div><!-- end col-lg-9 -->
+
+  <!-- ── Right Sidebar: Actions + Appt Info ── -->
+  <div class="col-lg-3">
+
+    <!-- Save / Complete -->
+    <div class="mc-card mb-2" style="border:1px solid #e9d5ff">
+      <div class="mc-card-body py-2 d-grid gap-2">
+        <button type="submit" name="action" value="save" class="btn py-2"
+                style="background:#3d1a78;color:#fff;border:none;font-size:.85rem">
+          <i class="bi bi-floppy me-1"></i>Save Consultation
+        </button>
+        <button type="submit" name="action" value="complete" class="btn btn-success py-2"
+                style="font-size:.85rem"
+                data-confirm="Mark this consultation as complete?">
+          <i class="bi bi-check-circle me-1"></i>Complete & Close
+        </button>
+        <a href="{{ url_for('opd.index', date=appt.appointment_date.isoformat()) }}"
+           class="btn btn-outline-secondary" style="font-size:.82rem">
+          <i class="bi bi-arrow-left me-1"></i>Back to OPD
+        </a>
+      </div>
+    </div>
+
+    <!-- Appointment Info Card -->
+    <div class="mc-card" style="border:1px solid #e9d5ff">
+      <div class="mc-card-header py-2" style="background:#f5f0ff;font-size:.78rem">
+        <i class="bi bi-calendar2-check" style="color:#5b21b6"></i>
+        <span style="color:#3d1a78">Appointment</span>
+      </div>
+      <div class="mc-card-body py-2">
+        <dl class="row mb-0" style="font-size:.74rem">
+          <dt class="col-5 text-muted">Token</dt>
+          <dd class="col-7 fw-bold" style="color:#3d1a78">#{{ appt.token_number }}</dd>
+          <dt class="col-5 text-muted">Date</dt>
+          <dd class="col-7">{{ appt.appointment_date.strftime('%d %b %Y') }}</dd>
+          <dt class="col-5 text-muted">Visit</dt>
+          <dd class="col-7">
+            <span class="mc-badge {% if appt.visit_type=='new' %}mc-badge-new{% elif appt.visit_type=='review' %}mc-badge-review{% else %}mc-badge-old{% endif %}" style="font-size:.62rem">
+              {{ appt.visit_type|title }}
+            </span>
+          </dd>
+          <dt class="col-5 text-muted">Status</dt>
+          <dd class="col-7">
+            <span class="mc-badge mc-badge-consult" style="font-size:.62rem">
+              {{ appt.status|replace('_',' ')|title }}
+            </span>
+          </dd>
+          <dt class="col-5 text-muted">Doctor</dt>
+          <dd class="col-7 small">{{ doctor.full_name }}</dd>
+          <dt class="col-5 text-muted">Speciality</dt>
+          <dd class="col-7 small">{{ doctor.specialisation or '—' }}</dd>
+          <dt class="col-5 text-muted">Reg No.</dt>
+          <dd class="col-7 small">{{ doctor.reg_number or '—' }}</dd>
+        </dl>
+      </div>
+    </div>
+
+  </div><!-- end right sidebar -->
+</div><!-- end row -->
+</div><!-- end #main-prescription -->
+
+<!-- ═══ RESULT TAB ═══ -->
+<div id="main-result" class="main-tab" style="display:none">
+  <div class="mc-card"><div class="mc-card-body">
+    <p class="text-muted">Lab results and scan reports will display here once entered in the Lab module.</p>
+  </div></div>
+</div>
+
+<!-- ═══ DIET TAB ═══ -->
+<div id="main-diet" class="main-tab" style="display:none">
+  <div class="mc-card"><div class="mc-card-body">
+    <label class="mc-label">Dietary Instructions</label>
+    <textarea name="diet_notes" class="form-control" rows="6"
+              placeholder="Dietary plan for patient…"></textarea>
+    <button type="submit" name="action" value="save" class="btn mt-3"
+            style="background:#3d1a78;color:#fff;border:none">Save Diet</button>
+  </div></div>
+</div>
+
+<!-- ═══ RX CONFIGURATION TAB (handwritten notebook spec) ═══ -->
+<div id="main-rxconfig" class="main-tab" style="display:none">
+  <div class="mc-card" style="border:1px solid #e9d5ff">
+    <div class="mc-card-header" style="background:#f5f0ff">
+      <i class="bi bi-gear" style="color:#5b21b6"></i>
+      <span style="color:#3d1a78">Rx Configuration — Preview</span>
+      <div class="ms-auto d-flex gap-2">
+        <select id="rx-lang-global" class="form-select form-select-sm" style="width:110px;font-size:.72rem">
+          <option value="en">English</option>
+          <option value="ta">Tamil</option>
+          <option value="hi">Hindi</option>
+        </select>
+        <button type="button" onclick="downloadRx()" class="btn btn-sm"
+                style="background:#3d1a78;color:#fff;border:none;font-size:.75rem">
+          <i class="bi bi-download me-1"></i>Download / Print
+        </button>
+      </div>
+    </div>
+    <div class="mc-card-body" id="rx-preview">
+      <!-- Auto-filled hospital header per Rivive notebook spec -->
+      <div style="border:2px solid #3d1a78;border-radius:8px;padding:16px;font-family:'DM Sans',sans-serif">
+        <!-- Header -->
+        <div style="text-align:center;border-bottom:1px solid #e9d5ff;padding-bottom:10px;margin-bottom:10px">
+          <div style="font-weight:800;font-size:1.1rem;color:#3d1a78">RIVIVE SPECIALITY CARE HOSPITAL</div>
+          <div style="font-size:.78rem;color:#6b7280">ECR, OMR, Thiruporur – 603103</div>
+          {% if branch %}
+          <div style="font-size:.75rem;color:#6b7280">Tel: {{ branch.phone or '' }} | {{ branch.email or '' }}</div>
+          {% endif %}
+        </div>
+        <!-- Patient + Doctor blocks -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:10px;font-size:.8rem">
+          <div>
+            <div><strong>Name:</strong> {{ patient.full_name }}</div>
+            <div><strong>ASH ID:</strong> {{ patient.uhid }}</div>
+            <div><strong>Age/Gender:</strong> {{ patient.age_years or '—' }}y / {{ patient.gender or '—' }}</div>
+            <div><strong>Phone:</strong> {{ patient.phone }}</div>
+          </div>
+          <div style="text-align:right">
+            <div><strong>{{ doctor.title }} {{ doctor.full_name }}</strong></div>
+            <div class="text-muted">{{ doctor.qualification or '' }}</div>
+            <div class="text-muted" style="font-size:.72rem">Reg: {{ doctor.reg_number or '—' }}</div>
+            <div class="text-muted">{{ appt.appointment_date.strftime('%d-%m-%Y %H:%M') }}</div>
+          </div>
+        </div>
+        <!-- Vitals strip -->
+        <div style="background:#f5f0ff;border-radius:6px;padding:8px 12px;margin-bottom:10px;font-size:.75rem;display:flex;gap:16px;flex-wrap:wrap">
+          <span><strong>BP:</strong> <span id="rx-bp-display">—</span></span>
+          <span><strong>Pulse:</strong> <span id="rx-pulse-display">—</span></span>
+          <span><strong>Wt:</strong> <span id="rx-wt-display">—</span>kg</span>
+          <span><strong>Ht:</strong> <span id="rx-ht-display">—</span>cm</span>
+          <span><strong>BMI:</strong> <span id="rx-bmi-display">—</span></span>
+          <span><strong>SpO2:</strong> <span id="rx-spo2-display">—</span>%</span>
+          <span><strong>Temp:</strong> <span id="rx-temp-display">—</span>°C</span>
+        </div>
+        <!-- Medicines table preview -->
+        <div style="font-size:.78rem">
+          <div style="font-weight:700;color:#3d1a78;margin-bottom:6px">Rx (Medicine):</div>
+          <div id="rx-meds-preview" style="color:#374151">
+            <em class="text-muted">Medicines entered in the Medicine tab will appear here.</em>
+          </div>
+        </div>
+        <!-- Advice/Remarks/Next Review/Tests -->
+        <div style="border-top:1px solid #e9d5ff;margin-top:10px;padding-top:8px;font-size:.78rem">
+          <div><strong>Advice:</strong> {{ consult.advice or '—' if consult else '—' }}</div>
+          <div><strong>Remarks:</strong> {{ consult.special_advice or '—' if consult else '—' }}</div>
+          <div><strong>Next Review:</strong> {{ consult.follow_up_date.strftime('%d-%m-%Y') if consult and consult.follow_up_date else '—' }}</div>
+          <div><strong>Tests:</strong> {{ consult.test_request or '—' if consult else '—' }}</div>
+        </div>
+        <div style="margin-top:16px;text-align:right;font-size:.72rem;color:#9ca3af">
+          Generated by Rivive SCH ERP
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ DRUG LIBRARY TAB ═══ -->
+<div id="main-druglibrary" class="main-tab" style="display:none">
+  <div class="mc-card" style="border:1px solid #e9d5ff">
+    <div class="mc-card-header" style="background:#f5f0ff">
+      <i class="bi bi-book" style="color:#5b21b6"></i>
+      <span style="color:#3d1a78">Drug Library</span>
+    </div>
+    <div class="mc-card-body">
+      <div class="input-group mb-3">
+        <input type="text" id="drug-lib-search" class="form-control"
+               placeholder="Search drug by generic name or brand…">
+        <button class="btn" type="button" style="background:#3d1a78;color:#fff;border:none">
+          <i class="bi bi-search"></i>
+        </button>
+      </div>
+      <div id="drug-lib-results" class="row g-2">
+        <div class="col-12 text-center text-muted py-3">
+          <i class="bi bi-capsule" style="font-size:2rem;opacity:.3;display:block;margin-bottom:8px"></i>
+          Search for a drug to see availability, stock, and standard doses.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</form><!-- end consultForm -->
+{% endblock %}
+
+{% block scripts %}
+<script>
+// ─── Tab switching ────────────────────────────────────────────────
+function switchMainTab(id) {
+  document.querySelectorAll('.main-tab').forEach(t => t.style.display='none');
+  document.getElementById('main-'+id).style.display='block';
+  document.querySelectorAll('[id^="main-btn-"]').forEach(b => {
+    b.classList.remove('active');
+    b.style.color='';
+    b.style.borderBottomColor='transparent';
+  });
+  const btn = document.getElementById('main-btn-'+id);
+  if(btn) {
+    btn.classList.add('active');
+    btn.style.color='#3d1a78';
+    btn.style.borderBottomColor='#3d1a78';
+  }
+  if(id === 'rxconfig') updateRxPreview();
+}
+
+function switchInnerTab(id) {
+  document.querySelectorAll('.inner-tab').forEach(t => t.style.display='none');
+  document.getElementById('inner-'+id).style.display='block';
+  document.querySelectorAll('[id^="inner-btn-"]').forEach(b => {
+    b.style.borderBottomColor='transparent';
+    b.style.color='#6b7280';
+    b.style.background='transparent';
+  });
+  const btn = document.getElementById('inner-btn-'+id);
+  if(btn) {
+    btn.style.borderBottomColor='#3d1a78';
+    btn.style.color='#3d1a78';
+    btn.style.background='#fff';
+  }
+}
+
+// Init first tab active
+switchInnerTab('old-visit');
+
+// ─── BMI auto-calc ────────────────────────────────────────────────
+function calcBMI() {
+  const w = parseFloat(document.getElementById('weight_kg')?.value);
+  const h = parseFloat(document.getElementById('height_cm')?.value) / 100;
+  const bmi = document.getElementById('bmi');
+  if (bmi && w > 0 && h > 0) bmi.value = (w/(h*h)).toFixed(1);
+}
+document.getElementById('weight_kg')?.addEventListener('input', calcBMI);
+document.getElementById('height_cm')?.addEventListener('input', calcBMI);
+
+// ─── Copy previous vitals ─────────────────────────────────────────
+function copyPrevVitals(sys, dia, wt, ht) {
+  if(sys) document.querySelector('[name="bp_systolic"]').value = sys;
+  if(dia) document.querySelector('[name="bp_diastolic"]').value = dia;
+  if(wt)  { document.getElementById('weight_kg').value = wt; }
+  if(ht)  { document.getElementById('height_cm').value = ht; }
+  calcBMI();
+}
+
+// ─── Patient History ⊕ add row ────────────────────────────────────
+function addHistRow(bodyId, typeName, descName, types) {
+  const body = document.getElementById(bodyId);
+  const row  = document.createElement('div');
+  row.className = 'hist-entry-row d-flex gap-1 mb-1';
+  let typeOpts = types.map(t => `<option>${t}</option>`).join('');
+
+  // Special layout for drug history
+  if(bodyId === 'drug-hist-body') {
+    row.innerHTML = `
+      <select name="${typeName}" class="form-select form-select-sm" style="width:100px;font-size:.7rem">${typeOpts}</select>
+      <input type="text" name="dh_drug[]" class="form-control form-control-sm" style="font-size:.72rem" placeholder="Drug name">
+      <input type="text" name="${descName}" class="form-control form-control-sm" style="font-size:.72rem" placeholder="Details / severity">
+      <button type="button" onclick="this.closest('.hist-entry-row').remove()" class="btn btn-sm btn-outline-danger" style="padding:2px 6px;font-size:.7rem">×</button>`;
+  } else if(bodyId === 'immuniz-body') {
+    row.innerHTML = `
+      <select name="${typeName}" class="form-select form-select-sm" style="width:80px;font-size:.7rem">${typeOpts}</select>
+      <input type="text" name="imm_vaccine[]" class="form-control form-control-sm" style="font-size:.72rem" placeholder="Vaccine name">
+      <input type="date" name="imm_date[]" class="form-control form-control-sm" style="font-size:.72rem;width:110px">
+      <input type="text" name="${descName}" class="form-control form-control-sm" style="font-size:.72rem" placeholder="Dose/notes">
+      <button type="button" onclick="this.closest('.hist-entry-row').remove()" class="btn btn-sm btn-outline-danger" style="padding:2px 6px;font-size:.7rem">×</button>`;
+  } else if(bodyId === 'exam-body') {
+    row.innerHTML = `
+      <select name="ex_system[]" class="form-select form-select-sm" style="width:75px;font-size:.7rem">
+        ${['CVS','RS','CNS','GIT','MSK','General'].map(t=>`<option>${t}</option>`).join('')}
+      </select>
+      <select name="${typeName}" class="form-select form-select-sm" style="width:75px;font-size:.7rem">${typeOpts}</select>
+      <input type="text" name="${descName}" class="form-control form-control-sm" style="font-size:.72rem" placeholder="Examination finding…">
+      <button type="button" onclick="this.closest('.hist-entry-row').remove()" class="btn btn-sm btn-outline-danger" style="padding:2px 6px;font-size:.7rem">×</button>`;
+  } else {
+    row.innerHTML = `
+      <select name="${typeName}" class="form-select form-select-sm" style="width:90px;font-size:.7rem">${typeOpts}</select>
+      <input type="text" name="${descName}" class="form-control form-control-sm" style="font-size:.72rem" placeholder="Enter details…">
+      <button type="button" onclick="this.closest('.hist-entry-row').remove()" class="btn btn-sm btn-outline-danger" style="padding:2px 6px;font-size:.7rem">×</button>`;
+  }
+  body.appendChild(row);
+}
+
+// ─── Medicine row template ────────────────────────────────────────
+function addMedicineRow() {
+  const tbody = document.getElementById('rxBody');
+  const row = document.createElement('tr');
+  row.className = 'rx-row';
+  row.innerHTML = `
+    <td style="border:1px solid #f3e8ff;padding:4px;position:relative">
+      <input type="text" name="drug_name[]" class="form-control form-control-sm drug-input" placeholder="Drug name" required>
+      <div class="drug-check-badge" style="font-size:.62rem;margin-top:2px"></div>
+    </td>
+    <td style="border:1px solid #f3e8ff;padding:4px">
+      <input type="text" name="dosage[]" class="form-control form-control-sm" placeholder="500mg">
+    </td>
+    <td style="border:1px solid #f3e8ff;padding:4px">
+      <select name="route[]" class="form-select form-select-sm">
+        <option>Oral</option><option>IV</option><option>IM</option>
+        <option>SC</option><option>Topical</option><option>Inhaler</option><option>Drops</option>
+      </select>
+    </td>
+    ${['mor','act','night'].map(p=>`
+    <td style="border:1px solid #f3e8ff;padding:4px;text-align:center">
+      <input type="number" step="0.5" name="${p}[]" class="form-control form-control-sm text-center"
+             placeholder="0" style="width:45px;display:inline-block">
+      <select name="${p}_timing[]" class="form-select form-select-sm mt-1" style="width:52px;font-size:.62rem">
+        <option value="BF">B/F</option><option value="AF" selected>A/F</option>
+      </select>
+    </td>`).join('')}
+    <td style="border:1px solid #f3e8ff;padding:4px">
+      <input type="number" name="duration_days[]" class="form-control form-control-sm" placeholder="Days">
+    </td>
+    <td style="border:1px solid #f3e8ff;padding:4px">
+      <input type="number" name="quantity[]" class="form-control form-control-sm">
+    </td>
+    <td style="border:1px solid #f3e8ff;padding:4px">
+      <input type="text" name="instructions[]" class="form-control form-control-sm" placeholder="After food">
+    </td>
+    <td style="border:1px solid #f3e8ff;padding:4px">
+      <select name="rx_lang[]" class="form-select form-select-sm" style="font-size:.65rem">
+        <option value="en">English</option>
+        <option value="ta">Tamil</option>
+        <option value="hi">Hindi</option>
+      </select>
+    </td>
+    <td style="border:1px solid #f3e8ff;padding:4px;text-align:center">
+      <button type="button" class="btn btn-sm btn-outline-warning highlight-btn"
+              style="width:26px;height:26px;padding:0" title="Highlight">
+        <i class="bi bi-star" style="font-size:.72rem"></i>
+      </button>
+      <button type="button" class="btn btn-sm btn-outline-danger remove-rx mt-1"
+              style="width:26px;height:26px;padding:0">
+        <i class="bi bi-trash" style="font-size:.72rem"></i>
+      </button>
+    </td>`;
+  tbody.appendChild(row);
+  bindLastMedRow(row);
+}
+
+function bindLastMedRow(row) {
+  // Remove button
+  row.querySelector('.remove-rx').addEventListener('click', () => row.remove());
+
+  // Highlight star toggle
+  row.querySelector('.highlight-btn').addEventListener('click', function() {
+    const icon = this.querySelector('i');
+    const filled = icon.classList.contains('bi-star-fill');
+    icon.classList.toggle('bi-star', filled);
+    icon.classList.toggle('bi-star-fill', !filled);
+    this.classList.toggle('btn-outline-warning', filled);
+    this.classList.toggle('btn-warning', !filled);
+  });
+
+  // Drug name AJAX check
+  const input = row.querySelector('.drug-input');
+  const badge = row.querySelector('.drug-check-badge');
+  let timer;
+  input?.addEventListener('input', function() {
+    clearTimeout(timer);
+    const q = this.value.trim();
+    if(q.length < 2) { badge.innerHTML = ''; return; }
+    timer = setTimeout(() => {
+      fetch('/pharmacy/drug-search?q=' + encodeURIComponent(q))
+        .then(r => r.json())
+        .then(drugs => {
+          if(drugs.length) {
+            const d = drugs[0];
+            badge.innerHTML = `<span style="color:#059669">✓ In stock: ${d.stock} ${d.form||''}</span>`;
+          } else {
+            badge.innerHTML = `<span style="color:#d97706">⚠ Not found in pharmacy</span>`;
+          }
+        });
+    }, 400);
+  });
+}
+
+// Bind existing rows
+document.querySelectorAll('#rxBody .rx-row').forEach(row => bindLastMedRow(row));
+
+// Add first empty row if none
+if(document.getElementById('rxBody').children.length === 0) addMedicineRow();
+
+// ─── Custom test ──────────────────────────────────────────────────
+function addCustomTest() {
+  const area = document.getElementById('custom-tests-area');
+  const div  = document.createElement('div');
+  div.className = 'd-flex gap-2 mb-1 align-items-center';
+  div.innerHTML = `
+    <input type="text" name="custom_test[]" class="form-control form-control-sm"
+           placeholder="Custom test name" style="max-width:220px">
+    <button type="button" onclick="this.parentElement.remove()"
+            class="btn btn-sm btn-outline-danger" style="padding:3px 8px">×</button>`;
+  area.appendChild(div);
+}
+
+// ─── Rx Preview auto-update ───────────────────────────────────────
+function updateRxPreview() {
+  // Vitals
+  const get = n => document.querySelector(`[name="${n}"]`)?.value || '—';
+  document.getElementById('rx-bp-display').textContent  = get('bp_systolic') + '/' + get('bp_diastolic');
+  document.getElementById('rx-pulse-display').textContent = get('pulse_bpm');
+  document.getElementById('rx-wt-display').textContent  = get('weight_kg');
+  document.getElementById('rx-ht-display').textContent  = get('height_cm');
+  document.getElementById('rx-bmi-display').textContent = get('bmi');
+  document.getElementById('rx-spo2-display').textContent = get('spo2_percent');
+  document.getElementById('rx-temp-display').textContent = get('temp_celsius');
+
+  // Medicines
+  const lang = document.getElementById('rx-lang-global')?.value || 'en';
+  const labels = {
+    en: {mor:'Morning', act:'Afternoon', night:'Night', bf:'Before Food', af:'After Food'},
+    ta: {mor:'காலை', act:'மதியம்', night:'இரவு', bf:'சாப்பிடும் முன்', af:'சாப்பிட்ட பின்'},
+    hi: {mor:'सुबह', act:'दोपहर', night:'रात', bf:'खाने से पहले', af:'खाने के बाद'},
+  };
+  const L = labels[lang] || labels.en;
+
+  const rows = document.querySelectorAll('#rxBody .rx-row');
+  let html = '';
+  rows.forEach((row, i) => {
+    const drug = row.querySelector('[name="drug_name[]"]')?.value;
+    if(!drug?.trim()) return;
+    const dosage = row.querySelector('[name="dosage[]"]')?.value || '';
+    const mor    = row.querySelector('[name="mor[]"]')?.value || '0';
+    const morT   = row.querySelector('[name="mor_timing[]"]')?.value === 'BF' ? L.bf : L.af;
+    const act    = row.querySelector('[name="act[]"]')?.value || '0';
+    const actT   = row.querySelector('[name="act_timing[]"]')?.value === 'BF' ? L.bf : L.af;
+    const night  = row.querySelector('[name="night[]"]')?.value || '0';
+    const nightT = row.querySelector('[name="night_timing[]"]')?.value === 'BF' ? L.bf : L.af;
+    const days   = row.querySelector('[name="duration_days[]"]')?.value || '';
+    const instr  = row.querySelector('[name="instructions[]"]')?.value || '';
+
+    html += `<div style="margin-bottom:6px;padding-left:12px">
+      <span style="font-weight:600">${i+1}. ${drug}</span> ${dosage}
+      <span style="color:#6b7280;font-size:.75rem;display:block;margin-left:12px">
+        ${L.mor}: ${mor} (${morT}) &nbsp;|&nbsp;
+        ${L.act}: ${act} (${actT}) &nbsp;|&nbsp;
+        ${L.night}: ${night} (${nightT})
+        ${days ? '&nbsp;— ' + days + ' days' : ''}
+        ${instr ? '&nbsp;| ' + instr : ''}
+      </span>
+    </div>`;
+  });
+  document.getElementById('rx-meds-preview').innerHTML = html || '<em class="text-muted">No medicines added yet.</em>';
+}
+
+// Rx Language change
+document.getElementById('rx-lang-global')?.addEventListener('change', updateRxPreview);
+
+// ─── Download / Print Rx ──────────────────────────────────────────
+function downloadRx() {
+  const lang = document.getElementById('rx-lang-global')?.value || 'en';
+  const langNames = {en:'English', ta:'Tamil', hi:'Hindi'};
+
+  // Popup confirmation per spec
+  const chosen = confirm(
+    `Print / Download Prescription\n\nSelected Language: ${langNames[lang]}\n\n` +
+    `Click OK to open print dialog.`
+  );
+  if(!chosen) return;
+
+  updateRxPreview();
+
+  // Print just the preview div
+  const content = document.getElementById('rx-preview').innerHTML;
+  const win = window.open('', '_blank', 'width=800,height=900');
+  win.document.write(`
+    <!DOCTYPE html><html><head>
+    <title>Prescription — {{ patient.full_name }}</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&display=swap">
+    <style>
+      body { font-family:'DM Sans',sans-serif; margin:20px; font-size:13px; }
+      @page { margin:15mm; }
+      @media print { body { margin:0; } }
+    </style>
+    </head><body>${content}</body></html>`);
+  win.document.close();
+  setTimeout(() => win.print(), 600);
+}
+
+// ─── Drug Library search ──────────────────────────────────────────
+document.getElementById('drug-lib-search')?.addEventListener('input', function() {
+  const q = this.value.trim();
+  if(q.length < 2) return;
+  fetch('/pharmacy/drug-search?q=' + encodeURIComponent(q))
+    .then(r => r.json())
+    .then(drugs => {
+      const res = document.getElementById('drug-lib-results');
+      if(!drugs.length) {
+        res.innerHTML = '<div class="col-12 text-center text-muted py-3">No drugs found.</div>';
+        return;
+      }
+      res.innerHTML = drugs.map(d => `
+        <div class="col-md-4">
+          <div style="border:1px solid #e9d5ff;border-radius:8px;padding:10px;font-size:.78rem">
+            <div style="font-weight:700;color:#3d1a78">${d.name}</div>
+            ${d.brand ? `<div class="text-muted">${d.brand}</div>` : ''}
+            <div>Form: ${d.form||'—'} | Strength: ${d.strength||'—'}</div>
+            <div style="margin-top:4px">
+              <span style="color:${d.stock>0?'#059669':'#dc2626'};font-weight:600">
+                ${d.stock>0?'✓ Stock: '+d.stock:'✗ Out of stock'}
+              </span>
+              <span class="ms-2 text-muted">₹${d.rate||'0'}/unit</span>
+            </div>
+            <button type="button" onclick="addDrugFromLibrary('${d.name}','${d.form||''}','${d.strength||''}')"
+                    class="btn btn-sm mt-2" style="background:#5b21b6;color:#fff;border:none;font-size:.7rem;padding:3px 10px">
+              + Add to Prescription
+            </button>
+          </div>
+        </div>`).join('');
+    });
+});
+
+function addDrugFromLibrary(name, form, strength) {
+  switchMainTab('prescription');
+  switchInnerTab('medicine');
+  addMedicineRow();
+  const lastRow = document.querySelectorAll('#rxBody .rx-row');
+  const last = lastRow[lastRow.length-1];
+  if(last) {
+    last.querySelector('[name="drug_name[]"]').value = name;
+    last.querySelector('[name="dosage[]"]').value    = strength;
+  }
+}
+</script>
+{% endblock %}

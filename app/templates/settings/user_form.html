@@ -1,0 +1,85 @@
+{% extends "shared/base.html" %}
+{% block title %}{{ 'Edit' if user else 'New' }} User{% endblock %}
+{% block content %}
+<div class="mc-page-header">
+  <h1 class="mc-page-title"><i class="bi bi-person-plus me-2"></i>{{ 'Edit' if user else 'New' }} User</h1>
+  <a href="{{ url_for('settings.users') }}" class="btn btn-outline-secondary btn-sm">← Back</a>
+</div>
+<div class="row justify-content-center">
+<div class="col-md-7">
+<div class="mc-card">
+<div class="mc-card-body">
+<form method="POST">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <div class="row g-3">
+    <div class="col-md-6">
+      <label class="mc-form-label mc-required">Full Name</label>
+      <input type="text" name="full_name" class="form-control" required value="{{ user.full_name if user else '' }}">
+    </div>
+    <div class="col-md-6">
+      <label class="mc-form-label mc-required">Username</label>
+      <input type="text" name="username" class="form-control" required value="{{ user.username if user else '' }}" {% if user %}readonly{% endif %}>
+    </div>
+    <div class="col-md-6">
+      <label class="mc-form-label mc-required">Email</label>
+      <input type="email" name="email" class="form-control" required value="{{ user.email if user else '' }}">
+    </div>
+    <div class="col-md-6">
+      <label class="mc-form-label">Phone</label>
+      <input type="text" name="phone" class="form-control" value="{{ user.phone if user else '' }}">
+    </div>
+    {% if not user %}
+    <div class="col-md-6">
+      <label class="mc-form-label mc-required">Password</label>
+      <input type="password" name="password" class="form-control" required minlength="8" placeholder="Min 8 characters">
+    </div>
+    {% endif %}
+    <div class="col-md-6">
+      <label class="mc-form-label mc-required">Role</label>
+      <select name="role_id" class="form-select" required>
+        <option value="">Select Role</option>
+        {% for r in roles %}
+        <option value="{{ r.id }}" {% if user and user.role_id == r.id %}selected{% endif %}>{{ r.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    {% if current_user.is_superadmin and branches %}
+    <div class="col-md-6">
+      <label class="mc-form-label">Branch</label>
+      <select name="branch_id" class="form-select">
+        <option value="">All Branches (SuperAdmin)</option>
+        {% for b in branches %}
+        <option value="{{ b.id }}" {% if user and user.branch_id == b.id %}selected{% endif %}>{{ b.code }} — {{ b.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    {% endif %}
+    {% if user %}
+    <div class="col-md-6">
+      <label class="mc-form-label">Account Status</label>
+      <div class="form-check form-switch mt-2">
+        <input class="form-check-input" type="checkbox" name="is_active" id="is_active" {% if user.is_active %}checked{% endif %}>
+        <label class="form-check-label" for="is_active">Active</label>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+  <div class="d-flex gap-2 mt-4">
+    <button type="submit" class="btn btn-primary"><i class="bi bi-check-circle me-1"></i>Save User</button>
+    <a href="{{ url_for('settings.users') }}" class="btn btn-outline-secondary">Cancel</a>
+  </div>
+</form>
+
+{% if user %}
+<hr>
+<h6 class="text-muted">Reset Password</h6>
+<form method="POST" action="{{ url_for('settings.user_reset_password', user_id=user.id) }}" class="d-flex gap-2">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input type="password" name="new_password" class="form-control form-control-sm" placeholder="New password (min 8)" required minlength="8" style="max-width:220px">
+  <button type="submit" class="btn btn-sm btn-warning" data-confirm="Reset this user's password?">Reset Password</button>
+</form>
+{% endif %}
+
+</div></div>
+</div></div>
+{% endblock %}

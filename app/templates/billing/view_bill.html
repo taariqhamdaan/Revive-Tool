@@ -1,0 +1,65 @@
+{% extends "shared/base.html" %}
+{% block title %}Bill {{ bill.bill_number }}{% endblock %}
+{% block content %}
+<div class="mc-page-header">
+  <h1 class="mc-page-title"><i class="bi bi-receipt"></i> Bill — {{ bill.bill_number }}</h1>
+  <div class="d-flex gap-2">
+    <a href="{{ url_for('billing.print_bill', bill_id=bill.id) }}" class="btn btn-outline-secondary btn-sm" target="_blank">
+      <i class="bi bi-printer me-1"></i>Print
+    </a>
+    <a href="{{ url_for('billing.index') }}" class="btn btn-outline-secondary btn-sm">← Back</a>
+  </div>
+</div>
+<div class="row g-3">
+  <div class="col-md-8">
+    <div class="mc-card">
+      <div class="mc-card-header"><i class="bi bi-list-ul"></i> Bill Items</div>
+      <div class="mc-card-body p-0">
+        <table class="mc-table">
+          <thead><tr><th>#</th><th>Description</th><th>Qty</th><th>Rate</th><th>GST</th><th>Amount</th></tr></thead>
+          <tbody>
+            {% for item in items %}
+            <tr>
+              <td>{{ loop.index }}</td>
+              <td>{{ item.description }}</td>
+              <td>{{ item.quantity }}</td>
+              <td>₹{{ "{:,.2f}".format(item.unit_rate) }}</td>
+              <td class="small text-muted">{{ item.gst_percent }}% (₹{{ "{:,.2f}".format(item.gst_amount) }})</td>
+              <td class="fw-semibold">₹{{ "{:,.2f}".format(item.amount) }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="mc-card mb-3">
+      <div class="mc-card-header"><i class="bi bi-calculator"></i> Summary</div>
+      <div class="mc-card-body">
+        <dl class="row mb-0 small">
+          <dt class="col-7">Subtotal</dt><dd class="col-5 text-end">₹{{ "{:,.2f}".format(bill.subtotal or 0) }}</dd>
+          <dt class="col-7">Discount ({{ bill.discount_percent or 0 }}%)</dt><dd class="col-5 text-end text-warning">- ₹{{ "{:,.2f}".format(bill.discount_amount or 0) }}</dd>
+          <dt class="col-7">GST</dt><dd class="col-5 text-end">₹{{ "{:,.2f}".format(bill.gst_amount or 0) }}</dd>
+          <dt class="col-7 fw-bold">Gross Total</dt><dd class="col-5 text-end fw-bold text-success">₹{{ "{:,.2f}".format(bill.gross_total or 0) }}</dd>
+          <dt class="col-7">Paid</dt><dd class="col-5 text-end">₹{{ "{:,.2f}".format(bill.paid_amount or 0) }}</dd>
+          <dt class="col-7">Balance</dt><dd class="col-5 text-end {% if (bill.balance_amount or 0) > 0 %}text-danger{% else %}text-success{% endif %} fw-bold">₹{{ "{:,.2f}".format(bill.balance_amount or 0) }}</dd>
+        </dl>
+      </div>
+    </div>
+    <div class="mc-card">
+      <div class="mc-card-header"><i class="bi bi-cash-stack"></i> Payments</div>
+      <div class="mc-card-body">
+        {% for p in payments %}
+        <div class="d-flex justify-content-between small mb-1">
+          <span>{{ p.payment_mode|title }} {% if p.reference_no %}<span class="text-muted">({{ p.reference_no }})</span>{% endif %}</span>
+          <strong>₹{{ "{:,.2f}".format(p.amount) }}</strong>
+        </div>
+        {% else %}
+        <p class="text-muted small mb-0">No payments recorded.</p>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

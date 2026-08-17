@@ -1,0 +1,96 @@
+{% extends "shared/base.html" %}
+{% block title %}{{ 'Edit' if employee else 'New' }} Employee{% endblock %}
+{% block content %}
+<div class="mc-page-header">
+  <div>
+    <h1 class="mc-page-title"><i class="bi bi-person-plus"></i> {{ 'Edit' if employee else 'Register' }} Employee</h1>
+    <div class="mc-breadcrumb"><a href="{{ url_for('hr.index') }}">HR</a> / {{ 'Edit' if employee else 'New' }}</div>
+  </div>
+</div>
+<form method="POST" action="{{ url_for('hr.employee_edit', emp_id=employee.id) if employee else url_for('hr.employee_new') }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+<div class="row g-3">
+  <div class="col-lg-8">
+    <div class="mc-card mb-3">
+      <div class="mc-card-header"><i class="bi bi-person-vcard"></i> Personal Details</div>
+      <div class="mc-card-body">
+        <div class="row g-3">
+          <div class="col-md-5"><label class="mc-label required">First Name</label><input type="text" name="first_name" class="form-control" required value="{{ employee.first_name if employee else '' }}"></div>
+          <div class="col-md-5"><label class="mc-label">Last Name</label><input type="text" name="last_name" class="form-control" value="{{ employee.last_name if employee else '' }}"></div>
+          <div class="col-md-2"><label class="mc-label">Gender</label>
+            <select name="gender" class="form-select">
+              <option value="">—</option>
+              {% for g in ['Male','Female','Other'] %}<option value="{{ g }}" {% if employee and employee.gender==g %}selected{% endif %}>{{ g }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="col-md-4"><label class="mc-label">Department</label>
+            <select name="department_id" class="form-select">
+              <option value="">— Select —</option>
+              {% for d in departments %}<option value="{{ d.id }}" {% if employee and employee.department_id==d.id %}selected{% endif %}>{{ d.name }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="col-md-4"><label class="mc-label">Designation</label>
+            <select name="designation_id" class="form-select">
+              <option value="">— Select —</option>
+              {% for d in designations %}<option value="{{ d.id }}" {% if employee and employee.designation_id==d.id %}selected{% endif %}>{{ d.name }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="col-md-4"><label class="mc-label">Employment Type</label>
+            <select name="employment_type" class="form-select">
+              {% for t in ['fulltime','parttime','contract','visiting','intern'] %}<option value="{{ t }}" {% if employee and employee.employment_type==t %}selected{% elif not employee and t=='fulltime' %}selected{% endif %}>{{ t|title }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="col-md-4"><label class="mc-label required">Phone</label><input type="tel" name="phone" class="form-control" required value="{{ employee.phone if employee else '' }}"></div>
+          <div class="col-md-4"><label class="mc-label">Email</label><input type="email" name="email" class="form-control" value="{{ employee.email if employee else '' }}"></div>
+          <div class="col-md-4"><label class="mc-label required">Join Date</label><input type="date" name="join_date" class="form-control" required value="{{ employee.join_date.isoformat() if employee and employee.join_date else '' }}"></div>
+          <div class="col-md-4"><label class="mc-label">Date of Birth</label><input type="date" name="date_of_birth" class="form-control" value="{{ employee.date_of_birth.isoformat() if employee and employee.date_of_birth else '' }}"></div>
+          {% if employee %}
+          <div class="col-md-4">
+            <label class="mc-label">Status</label>
+            <div class="form-check form-switch mt-2">
+              <input class="form-check-input" type="checkbox" name="is_active" {% if employee.is_active %}checked{% endif %}>
+              <label class="form-check-label">Active</label>
+            </div>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="mc-card mb-3">
+      <div class="mc-card-header"><i class="bi bi-bank"></i> Bank & Identity</div>
+      <div class="mc-card-body">
+        <div class="row g-3">
+          <div class="col-md-4"><label class="mc-label">PAN Number</label><input type="text" name="pan_number" class="form-control" value="{{ employee.pan_number if employee else '' }}" placeholder="ABCDE1234F" maxlength="10"></div>
+          <div class="col-md-4"><label class="mc-label">Bank Account</label><input type="text" name="bank_account" class="form-control" value="{{ employee.bank_account if employee else '' }}"></div>
+          <div class="col-md-4"><label class="mc-label">IFSC Code</label><input type="text" name="bank_ifsc" class="form-control" value="{{ employee.bank_ifsc if employee else '' }}" placeholder="SBIN0001234"></div>
+          <div class="col-md-4"><label class="mc-label">Bank Name</label><input type="text" name="bank_name" class="form-control" value="{{ employee.bank_name if employee else '' }}"></div>
+          <div class="col-md-4"><label class="mc-label">UAN Number</label><input type="text" name="uan_number" class="form-control" value="{{ employee.uan_number if employee else '' }}"></div>
+          <div class="col-md-4"><label class="mc-label">ESI Number</label><input type="text" name="esi_number" class="form-control" value="{{ employee.esi_number if employee else '' }}"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="mc-card mb-3">
+      <div class="mc-card-header"><i class="bi bi-person-heart"></i> Emergency Contact</div>
+      <div class="mc-card-body">
+        <div class="row g-3">
+          <div class="col-md-6"><label class="mc-label">Contact Name</label><input type="text" name="emergency_contact_name" class="form-control" value="{{ employee.emergency_contact_name if employee else '' }}"></div>
+          <div class="col-md-6"><label class="mc-label">Contact Phone</label><input type="tel" name="emergency_contact_phone" class="form-control" value="{{ employee.emergency_contact_phone if employee else '' }}"></div>
+          <div class="col-12"><label class="mc-label">Address</label><textarea name="address" class="form-control" rows="2">{{ employee.address if employee else '' }}</textarea></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-4">
+    <div class="mc-card">
+      <div class="mc-card-body d-grid gap-2">
+        <button type="submit" class="btn btn-primary py-2"><i class="bi bi-check-circle me-1"></i>{{ 'Update' if employee else 'Register' }} Employee</button>
+        <a href="{{ url_for('hr.index') }}" class="btn btn-outline-secondary">Cancel</a>
+      </div>
+    </div>
+  </div>
+</div>
+</form>
+{% endblock %}

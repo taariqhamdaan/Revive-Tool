@@ -1,0 +1,55 @@
+{% extends "shared/base.html" %}
+{% block title %}IP Service Report{% endblock %}
+{% block subnav %}
+<div class="mc-subnav">
+  <a href="{{ url_for('reports.index') }}" class="mc-subnav-item"><i class="bi bi-arrow-left me-1"></i>Reports</a>
+  {% for sid, slabel in [('detailed','IP Service Detailed'),('overview','IP Service Overview'),
+     ('admission_list','Admission List'),('discharge_list','Discharge List'),
+     ('occupancy','Occupancy Report'),('payment_due','Payment Due'),('mlc','MLC Report')] %}
+  <a href="{{ url_for('reports.ip_service', sub=sid, date_from=date_from, date_to=date_to) }}"
+     class="mc-subnav-item {% if sub==sid %}active{% endif %}">{{ slabel }}</a>
+  {% endfor %}
+</div>
+{% endblock %}
+{% block content %}
+{% set report_type = 'ip_service' %}
+<div class="mc-page-header">
+  <h1 class="mc-page-title"><i class="bi bi-hospital"></i> IP Service Report — {{ sub|replace('_',' ')|title }}</h1>
+</div>
+{% include 'reports/_report_header.html' %}
+<div class="mc-card">
+  <div class="mc-card-header"><i class="bi bi-table"></i> {{ sub|replace('_',' ')|title }}
+    <span class="badge bg-primary ms-2">{{ data|length }}</span>
+  </div>
+  <div class="mc-card-body p-0">
+    <div class="mc-table-wrap">
+      <table class="mc-table mc-datatable">
+        <thead><tr><th>IP No.</th><th>Patient</th><th>UHID</th><th>Doctor</th><th>Ward/Bed</th><th>Admission Date</th><th>Discharge Date</th><th>Days</th><th>Status</th><th>Diagnosis</th></tr></thead>
+        <tbody>
+          {% for adm in data %}
+          <tr>
+            <td><span class="mc-uhid">{{ adm.ip_number }}</span></td>
+            <td class="fw-semibold">{{ adm.patient.full_name if adm.patient else '—' }}</td>
+            <td><span class="mc-uhid">{{ adm.patient.uhid if adm.patient else '—' }}</span></td>
+            <td class="small">{{ adm.doctor.full_name if adm.doctor else '—' }}</td>
+            <td class="small">{{ adm.ward.name if adm.ward else '—' }} / {{ adm.bed.bed_number if adm.bed else '—' }}</td>
+            <td class="small">{{ adm.admission_date.strftime('%d-%m-%Y') if adm.admission_date else '—' }}</td>
+            <td class="small">{{ adm.discharge_date.strftime('%d-%m-%Y') if adm.discharge_date else '—' }}</td>
+            <td class="small">
+              {% if adm.admission_date %}
+              {% set discharge = adm.discharge_date.date() if adm.discharge_date else today %}
+              {{ (discharge - adm.admission_date.date()).days + 1 }}
+              {% endif %}
+            </td>
+            <td><span class="mc-badge mc-badge-{% if adm.status=='admitted' %}admitted{% elif adm.status=='discharged' %}done{% else %}cancelled{% endif %}">{{ adm.status|title }}</span></td>
+            <td class="small text-muted">{{ adm.final_diagnosis or adm.provisional_diagnosis or '—' }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="10" class="text-center text-muted py-4">No admissions found for selected period.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

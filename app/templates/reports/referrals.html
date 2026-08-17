@@ -1,0 +1,32 @@
+{% extends "shared/base.html" %}
+{% block title %}Report{% endblock %}
+{% block subnav %}
+<div class="mc-subnav">
+  <a href="{{ url_for('reports.index') }}" class="mc-subnav-item"><i class="bi bi-arrow-left me-1"></i>Reports</a>
+</div>
+{% endblock %}
+{% block content %}
+{% set report_type = 'referrals' %}
+<div class="mc-page-header"><h1 class="mc-page-title"><i class="bi bi-bar-chart-line"></i> Report</h1></div>
+{% include 'reports/_report_header.html' %}
+<div class="mc-card">
+  <div class="mc-card-header"><i class="bi bi-table"></i> Data <span class="badge bg-primary ms-2">{{ data|length }}</span></div>
+  <div class="mc-card-body p-0 mc-table-wrap">
+    <table class="mc-table mc-datatable">
+      <thead><tr><th>#</th><th>Date</th><th>Patient</th><th>Status</th></tr></thead>
+      <tbody>
+        {% for row in data %}
+        <tr>
+          <td>{{ loop.index }}</td>
+          <td class="small">{{ row.created_at.strftime('%d-%m-%Y') if row.created_at else '—' }}</td>
+          <td>{{ row.patient.full_name if row.patient else '—' }}</td>
+          <td><span class="mc-badge mc-badge-new">{{ row.status|title if row.status else 'Active' }}</span></td>
+        </tr>
+        {% else %}
+        <tr><td colspan="4" class="text-center text-muted py-4">No data found.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,99 @@
+{% extends "shared/base.html" %}
+{% block title %}Daily Notes — {{ adm.ip_number }}{% endblock %}
+{% block content %}
+<div class="mc-page-header">
+  <div>
+    <h1 class="mc-page-title"><i class="bi bi-journal-text"></i> Daily Notes — {{ adm.ip_number }}</h1>
+    <div class="mc-breadcrumb"><a href="{{ url_for('ipd.index', tab='notes') }}">IPD</a> / {{ patient.full_name if patient else '—' }}</div>
+  </div>
+  <a href="{{ url_for('ipd.index', tab='notes') }}" class="btn btn-outline-secondary btn-sm">← Back</a>
+</div>
+
+<!-- Patient strip -->
+<div class="mc-card mb-3"><div class="mc-card-body py-2 px-3">
+  <div class="d-flex gap-3 align-items-center flex-wrap">
+    <div class="mc-stat-icon navy" style="width:38px;height:38px"><i class="bi bi-person" style="font-size:1rem"></i></div>
+    <div>
+      <div class="fw-bold">{{ patient.full_name if patient else '—' }} <span class="mc-uhid ms-2">{{ patient.uhid if patient else '' }}</span></div>
+      <div class="text-muted small">IP: {{ adm.ip_number }} | Ward: {{ adm.ward.name if adm.ward else '—' }} | Bed: {{ adm.bed.bed_number if adm.bed else '—' }} | Dr. {{ adm.doctor.full_name if adm.doctor else '—' }}</div>
+    </div>
+    <div class="ms-auto text-end small">
+      <div class="text-muted">Admitted</div>
+      <div class="fw-semibold">{{ adm.admission_date.strftime('%d %b %Y') if adm.admission_date else '—' }}</div>
+      <div class="text-muted">{% if adm.admission_date %}Day {{ (today - adm.admission_date.date()).days + 1 }}{% endif %}</div>
+    </div>
+  </div>
+</div></div>
+
+<div class="row g-3">
+  <!-- New note form -->
+  <div class="col-lg-5">
+    <div class="mc-card">
+      <div class="mc-card-header"><i class="bi bi-plus-circle"></i> Add Progress Note</div>
+      <div class="mc-card-body">
+        <form method="POST" action="{{ url_for('ipd.daily_notes', adm_id=adm.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <div class="row g-2 mb-3">
+            <div class="col-7"><label class="mc-label required">Date</label><input type="date" name="note_date" class="form-control form-control-sm" value="{{ today.isoformat() }}" required></div>
+            <div class="col-5"><label class="mc-label">Time</label><input type="time" name="note_time" class="form-control form-control-sm"></div>
+            <div class="col-12"><label class="mc-label">Note Type</label>
+              <select name="note_type" class="form-select form-select-sm">
+                {% for t in ['progress','nursing','dietary','physio'] %}<option value="{{ t }}">{{ t|title }}</option>{% endfor %}
+              </select>
+            </div>
+          </div>
+          <div class="mc-card mb-2" style="background:#f8fafc">
+            <div class="mc-card-body py-2">
+              <div class="fw-semibold small mb-2">Vitals</div>
+              <div class="row g-2">
+                <div class="col-6"><label class="mc-label">BP</label>
+                  <div class="input-group input-group-sm"><input type="number" name="bp_systolic" class="form-control" placeholder="Sys"><span class="input-group-text">/</span><input type="number" name="bp_diastolic" class="form-control" placeholder="Dia"></div>
+                </div>
+                <div class="col-6"><label class="mc-label">Pulse (bpm)</label><input type="number" name="pulse_bpm" class="form-control form-control-sm"></div>
+                <div class="col-6"><label class="mc-label">Temp (°C)</label><input type="number" step="0.1" name="temp_celsius" class="form-control form-control-sm"></div>
+                <div class="col-6"><label class="mc-label">SpO2 (%)</label><input type="number" name="spo2_percent" class="form-control form-control-sm" max="100"></div>
+              </div>
+            </div>
+          </div>
+          <div class="mb-2"><label class="mc-label required">Progress Notes</label><textarea name="notes" class="form-control" rows="4" required placeholder="Clinical findings, patient condition, treatment response…"></textarea></div>
+          <div class="mb-3"><label class="mc-label">Doctor's Orders</label><textarea name="orders" class="form-control" rows="2" placeholder="Instructions to nursing staff…"></textarea></div>
+          <button type="submit" class="btn btn-primary w-100"><i class="bi bi-floppy me-1"></i>Save Note</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Notes history -->
+  <div class="col-lg-7">
+    <div class="mc-card">
+      <div class="mc-card-header"><i class="bi bi-clock-history"></i> Notes History ({{ notes|length }})</div>
+      <div class="mc-card-body p-0" style="max-height:600px;overflow-y:auto">
+        {% for note in notes %}
+        <div class="p-3 border-bottom {% if loop.first %}{% endif %}">
+          <div class="d-flex justify-content-between align-items-start mb-1">
+            <div>
+              <span class="fw-semibold small">{{ note.note_date.strftime('%d %b %Y') }}</span>
+              {% if note.note_time %}<span class="text-muted small ms-2">{{ note.note_time.strftime('%H:%M') }}</span>{% endif %}
+              <span class="mc-badge mc-badge-new ms-2">{{ note.note_type|title }}</span>
+            </div>
+            <div class="text-muted small">Noted by: {{ note.noter.full_name if note.noter else '—' }}</div>
+          </div>
+          {% if note.bp_systolic %}
+          <div class="mc-vitals-strip mb-2" style="gap:6px">
+            <div class="mc-vital-box" style="min-width:80px"><div class="mc-vital-label">BP</div><div class="mc-vital-val" style="font-size:.9rem">{{ note.bp_systolic }}/{{ note.bp_diastolic }}</div></div>
+            {% if note.pulse_bpm %}<div class="mc-vital-box" style="min-width:70px"><div class="mc-vital-label">Pulse</div><div class="mc-vital-val" style="font-size:.9rem">{{ note.pulse_bpm }}</div></div>{% endif %}
+            {% if note.temp_celsius %}<div class="mc-vital-box" style="min-width:70px"><div class="mc-vital-label">Temp</div><div class="mc-vital-val" style="font-size:.9rem">{{ note.temp_celsius }}°</div></div>{% endif %}
+            {% if note.spo2_percent %}<div class="mc-vital-box" style="min-width:70px"><div class="mc-vital-label">SpO2</div><div class="mc-vital-val" style="font-size:.9rem">{{ note.spo2_percent }}%</div></div>{% endif %}
+          </div>
+          {% endif %}
+          <p class="mb-1 small">{{ note.notes }}</p>
+          {% if note.orders %}<p class="mb-0 small text-primary"><strong>Orders:</strong> {{ note.orders }}</p>{% endif %}
+        </div>
+        {% else %}
+        <div class="p-4 text-center text-muted">No notes recorded yet.</div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

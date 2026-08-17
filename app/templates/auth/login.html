@@ -1,73 +1,64 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Sign in — Rivive SCH</title>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-<style>
-:root{--p:#3d1a78;--pm:#5b21b6;--pa:#7c3aed;--pl:#ede9fe;--border:#e9d5ff}
-*{font-family:'DM Sans',sans-serif;box-sizing:border-box}
-body{background:#f8f5ff;color:#1f2937;margin:0;min-height:100vh;
-  display:flex;align-items:center;justify-content:center;padding:20px}
-.mc-card{background:#fff;border:1px solid var(--border);border-radius:12px;
-  overflow:hidden;box-shadow:0 1px 4px rgba(61,26,120,.06);width:100%;max-width:380px}
-.mc-card-header{padding:18px 20px;background:#f5f0ff;border-bottom:1px solid var(--border)}
-.mc-page-title{font-size:1.15rem;font-weight:800;color:var(--p);margin:0}
-.mc-breadcrumb{font-size:.75rem;color:#6b7280;margin-top:2px}
-.mc-card-body{padding:20px}
-.form-label{font-size:.78rem;font-weight:600;color:var(--p);margin-bottom:4px}
-.form-control{font-size:.85rem;border:1px solid var(--border)}
-.form-control:focus{border-color:var(--pa);box-shadow:0 0 0 .2rem rgba(124,58,237,.12)}
-.btn-p{background:#3d1a78;color:#fff;border:none;font-size:.85rem;font-weight:600;padding:9px}
-.btn-p:hover{background:#5b21b6;color:#fff}
-.alert{font-size:.8rem;padding:9px 12px;border-radius:8px}
-</style>
-</head>
-<body>
-<div class="mc-card">
-  <div class="mc-card-header">
-    <h1 class="mc-page-title"><i class="bi bi-activity me-1"></i>Rivive SCH</h1>
-    <div class="mc-breadcrumb">Laboratory Information System</div>
+{% extends "shared/base.html" %}
+{% block title %}Login{% endblock %}
+
+{% block content %}
+<div class="mc-auth-card">
+  <div class="mc-auth-logo">
+    <i class="bi bi-hospital-fill"></i>
+    <h1 style="color:#5b21b6">Rivive SCH</h1>
+    <p>Speciality Care Hospital — ECR, OMR, Thiruporur</p>
   </div>
-  <div class="mc-card-body">
 
-    {% with messages = get_flashed_messages(with_categories=true) %}
-      {% for category, message in messages %}
-        <div class="alert alert-{{ category }} mb-3">{{ message }}</div>
-      {% endfor %}
-    {% endwith %}
+  <form method="POST" action="{{ url_for('auth.login') }}" autocomplete="off">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
-    <form method="POST" autocomplete="on">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-
-      <div class="mb-3">
-        <label class="form-label" for="username">Username or Email</label>
-        <input class="form-control" id="username" name="username" type="text"
-               value="{{ username }}" required autofocus autocomplete="username">
+    <div class="mb-3">
+      <label class="mc-form-label mc-required">Username or Email</label>
+      <div class="input-group">
+        <span class="input-group-text"><i class="bi bi-person"></i></span>
+        <input type="text" name="username" class="form-control"
+               placeholder="Enter username or email" required autofocus
+               value="{{ request.form.get('username', '') }}">
       </div>
+    </div>
 
-      <div class="mb-3">
-        <label class="form-label" for="password">Password</label>
-        <input class="form-control" id="password" name="password" type="password"
-               required autocomplete="current-password">
+    <div class="mb-3">
+      <label class="mc-form-label mc-required">Password</label>
+      <div class="input-group">
+        <span class="input-group-text"><i class="bi bi-lock"></i></span>
+        <input type="password" name="password" id="password" class="form-control"
+               placeholder="Enter password" required>
+        <button type="button" class="btn btn-outline-secondary"
+                onclick="togglePwd()" tabindex="-1">
+          <i class="bi bi-eye" id="pwd-eye"></i>
+        </button>
       </div>
+    </div>
 
-      <div class="form-check mb-3">
-        <input class="form-check-input" type="checkbox" id="remember" name="remember" value="1">
-        <label class="form-check-label" for="remember" style="font-size:.78rem;color:#6b7280">
-          Keep me signed in
-        </label>
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <div class="form-check">
+        <input class="form-check-input" type="checkbox" name="remember" id="remember">
+        <label class="form-check-label small" for="remember">Remember me</label>
       </div>
+      <a href="{{ url_for('auth.forgot_password') }}" class="small">Forgot password?</a>
+    </div>
 
-      <button type="submit" class="btn btn-p w-100">
-        <i class="bi bi-box-arrow-in-right me-1"></i>Sign in
-      </button>
-    </form>
+    <button type="submit" class="btn btn-primary w-100 py-2">
+      <i class="bi bi-box-arrow-in-right me-2"></i>Sign In
+    </button>
+  </form>
 
-  </div>
+  <p class="text-center mt-4 mb-0 small text-muted">
+    Rivive SCH &copy; {{ now().year if now is callable else 2025 }} — Secure Medical ERP
+  </p>
 </div>
-</body>
-</html>
+
+<script>
+function togglePwd() {
+  const p = document.getElementById('password');
+  const e = document.getElementById('pwd-eye');
+  if (p.type === 'password') { p.type = 'text'; e.className = 'bi bi-eye-slash'; }
+  else { p.type = 'password'; e.className = 'bi bi-eye'; }
+}
+</script>
+{% endblock %}

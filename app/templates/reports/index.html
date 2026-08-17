@@ -1,0 +1,51 @@
+{% extends "shared/base.html" %}
+{% block title %}Reports{% endblock %}
+
+{% block subnav %}
+<div class="mc-subnav">
+  {% for endpoint, label in [
+    ('reports.op_service',    'OP Service Report'),
+    ('reports.ip_service',    'IP Service Report'),
+    ('reports.appointments',  'Appointment Report'),
+    ('reports.patient_report','Patient Report'),
+    ('reports.referrals',     'Referral Report'),
+    ('reports.insurance',     'Insurance Report'),
+  ] %}
+  <a href="{{ url_for(endpoint) }}" class="mc-subnav-item {% if request.endpoint == endpoint %}active{% endif %}">{{ label }}</a>
+  {% endfor %}
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="mc-page-header">
+  <h1 class="mc-page-title"><i class="bi bi-bar-chart-line"></i> Reports & Analytics</h1>
+</div>
+
+<div class="row g-3">
+  {% set sections = [
+    ('reports.op_service',    'OP Service Report',    'person-check',    'navy',  'OP Service Detailed, Overview, Share, Consultation Wise, Audit Log'),
+    ('reports.ip_service',    'IP Service Report',    'hospital',        'teal',  'IP Detailed, Overview, Admission List, Discharge List, Occupancy, Payment Due, MLC'),
+    ('reports.appointments',  'Appointment Report',   'calendar-check',  'green', 'Patient Appointment, Doctor Appointment, Appointment Type Report'),
+    ('reports.patient_report','Patient Report',       'people',          'blue',  'Demographic, Purpose of Visit, Diagnosis, Concession, Doctor-wise Consultation'),
+    ('reports.referrals',     'Referral Report',      'share',           'amber', 'Referral Report, Referral Count, OP/IP Referral Source'),
+    ('reports.insurance',     'Insurance Report',     'shield-check',    'red',   'Insurance Patient Report, Insurance Claim Amount Report'),
+  ] %}
+  {% for endpoint, title, icon, color, desc in sections %}
+  <div class="col-md-4">
+    <a href="{{ url_for(endpoint) }}" class="text-decoration-none">
+      <div class="mc-card h-100" style="transition:box-shadow .15s,transform .15s;cursor:pointer" onmouseover="this.style.boxShadow='0 4px 16px rgba(0,0,0,.1)';this.style.transform='translateY(-2px)'" onmouseout="this.style.boxShadow='';this.style.transform=''">
+        <div class="mc-card-body d-flex gap-3 align-items-start">
+          <div class="mc-stat-icon {{ color }}" style="width:44px;height:44px;font-size:1.2rem;flex-shrink:0">
+            <i class="bi bi-{{ icon }}"></i>
+          </div>
+          <div>
+            <div class="fw-semibold mb-1">{{ title }}</div>
+            <div class="text-muted small" style="line-height:1.4">{{ desc }}</div>
+          </div>
+        </div>
+      </div>
+    </a>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

@@ -1,0 +1,576 @@
+{% extends "shared/base.html" %}
+{% block title %}Pharmacy{% endblock %}
+
+{% block subnav %}
+<div class="mc-subnav">
+  {% for tid, lbl in [('drugs','Drug Master'),('stock','Stock'),('purchase','Purchase Orders'),
+     ('grn','GRN'),('dispensing','Dispensing'),('expiry','Expiry Alerts'),('suppliers','Suppliers')] %}
+  <a href="{{ url_for('pharmacy.index', tab=tid) }}"
+     class="mc-subnav-item {% if tab==tid %}active{% endif %}">{{ lbl }}</a>
+  {% endfor %}
+  <div class="ms-auto d-flex gap-2 pe-2">
+    {% if tab == 'drugs' %}
+    <a href="{{ url_for('pharmacy.bulk_upload') }}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-upload me-1"></i>Bulk Upload</a>
+    <a href="{{ url_for('pharmacy.download_template') }}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-download me-1"></i>Template</a>
+    <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addDrugModal"><i class="bi bi-plus-circle me-1"></i>Add Drug</button>
+    {% elif tab == 'purchase' %}
+    <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addPOModal"><i class="bi bi-plus-circle me-1"></i>New PO</button>
+    {% elif tab == 'grn' %}
+    <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addGRNModal"><i class="bi bi-plus-circle me-1"></i>New GRN</button>
+    {% elif tab == 'dispensing' %}
+    <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#dispenseModal"><i class="bi bi-capsule me-1"></i>Dispense</button>
+    {% elif tab == 'suppliers' %}
+    <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addSupModal"><i class="bi bi-plus-circle me-1"></i>Add Supplier</button>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+
+{# ── DRUG MASTER ── #}
+{% if tab == 'drugs' %}
+<div class="mc-page-header">
+  <h1 class="mc-page-title"><i class="bi bi-capsule"></i> Drug Master</h1>
+</div>
+<div class="mc-card mb-3"><div class="mc-card-body py-2">
+  <form method="GET" class="d-flex gap-2">
+    <input type="hidden" name="tab" value="drugs">
+    <input type="text" name="q" class="form-control form-control-sm" placeholder="Search drug name, brand or code…" value="{{ search or '' }}" style="max-width:300px">
+    <button type="submit" class="btn btn-primary btn-sm">Search</button>
+  </form>
+</div></div>
+<div class="mc-card">
+  <div class="mc-card-body p-0">
+    <div class="mc-table-wrap">
+      <table class="mc-table">
+        <thead><tr><th>Code</th><th>Generic Name</th><th>Brand</th><th>Strength/Form</th><th>Schedule</th><th>Stock</th><th>Reorder</th><th>MRP</th><th>Sale Rate</th><th>GST%</th><th>Status</th><th>Action</th></tr></thead>
+        <tbody>
+          {% for d in drugs.items %}
+          <tr class="{% if d.current_stock <= d.reorder_level %}table-warning{% endif %}">
+            <td><span class="mc-uhid">{{ d.drug_code or '—' }}</span></td>
+            <td class="fw-semibold">{{ d.generic_name }}</td>
+            <td class="small text-muted">{{ d.brand_name or '—' }}</td>
+            <td class="small">{{ d.strength or '' }} {{ d.form or '' }}</td>
+            <td class="small">{{ d.schedule or '—' }}</td>
+            <td class="fw-bold {% if d.current_stock <= d.reorder_level %}text-danger{% else %}text-success{% endif %}">{{ d.current_stock or 0 }}</td>
+            <td class="small text-muted">{{ d.reorder_level }}</td>
+            <td class="small">₹{{ "{:.2f}".format(d.mrp or 0) }}</td>
+            <td class="small">₹{{ "{:.2f}".format(d.sale_rate or 0) }}</td>
+            <td class="small">{{ d.gst_percent or 0 }}%</td>
+            <td><span class="mc-badge {% if d.is_active %}mc-badge-active{% else %}mc-badge-inactive{% endif %}">{{ 'Active' if d.is_active else 'Inactive' }}</span></td>
+            <td>
+              <button class="btn btn-icon btn-outline-secondary btn-sm edit-drug-btn"
+                data-id="{{ d.id }}" data-generic="{{ d.generic_name }}" data-brand="{{ d.brand_name or '' }}"
+                data-strength="{{ d.strength or '' }}" data-form="{{ d.form or '' }}"
+                data-mrp="{{ d.mrp or 0 }}" data-rate="{{ d.sale_rate or 0 }}"
+                data-purchase="{{ d.purchase_rate or 0 }}" data-gst="{{ d.gst_percent or 12 }}"
+                data-reorder="{{ d.reorder_level or 10 }}" data-schedule="{{ d.schedule or '' }}"
+                title="Edit"><i class="bi bi-pencil"></i></button>
+              <form method="POST" action="{{ url_for('pharmacy.drug_toggle', drug_id=d.id) }}" class="d-inline">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="btn btn-icon btn-sm {% if d.is_active %}btn-outline-warning{% else %}btn-outline-success{% endif %}"
+                        title="{{ 'Deactivate' if d.is_active else 'Activate' }}"
+                        data-confirm="{{ 'Deactivate' if d.is_active else 'Activate' }} this drug?">
+                  <i class="bi bi-{% if d.is_active %}pause{% else %}play{% endif %}"></i>
+                </button>
+              </form>
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="12" class="text-center text-muted py-4"><i class="bi bi-capsule display-6 d-block mb-2 opacity-25"></i>No drugs found. Add drugs or use bulk upload.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% if drugs.pages > 1 %}
+  <div class="mc-pager">
+    <span>{{ drugs.total }} drugs</span>
+    <nav><ul class="pagination pagination-sm mb-0">
+      <li class="page-item {% if not drugs.has_prev %}disabled{% endif %}"><a class="page-link" href="{{ url_for('pharmacy.index', tab='drugs', page=drugs.prev_num, q=search) }}">‹</a></li>
+      {% for p in drugs.iter_pages() %}{% if p %}<li class="page-item {% if p==drugs.page %}active{% endif %}"><a class="page-link" href="{{ url_for('pharmacy.index', tab='drugs', page=p, q=search) }}">{{ p }}</a></li>{% endif %}{% endfor %}
+      <li class="page-item {% if not drugs.has_next %}disabled{% endif %}"><a class="page-link" href="{{ url_for('pharmacy.index', tab='drugs', page=drugs.next_num, q=search) }}">›</a></li>
+    </ul></nav>
+  </div>
+  {% endif %}
+</div>
+
+{# ── STOCK VIEW ── #}
+{% elif tab == 'stock' %}
+<div class="mc-page-header">
+  <h1 class="mc-page-title"><i class="bi bi-boxes"></i> Stock Levels</h1>
+</div>
+<div class="row g-2 mb-3">
+  <div class="col-md-3"><div class="mc-stat"><div class="mc-stat-icon green"><i class="bi bi-boxes"></i></div><div><div class="mc-stat-val">{{ drugs.total }}</div><div class="mc-stat-lbl">Total Drugs</div></div></div></div>
+  <div class="col-md-3"><div class="mc-stat"><div class="mc-stat-icon red"><i class="bi bi-exclamation-triangle"></i></div><div><div class="mc-stat-val">{{ drugs.items | selectattr('current_stock', 'le', 'reorder_level') | list | length }}</div><div class="mc-stat-lbl">Low Stock</div></div></div></div>
+</div>
+<div class="mc-card">
+  <div class="mc-card-body p-0 mc-table-wrap">
+    <table class="mc-table mc-datatable">
+      <thead><tr><th>Drug Name</th><th>Brand</th><th>Form</th><th>Current Stock</th><th>Reorder Level</th><th>MRP</th><th>Status</th></tr></thead>
+      <tbody>
+        {% for d in drugs.items %}
+        <tr class="{% if (d.current_stock or 0) <= d.reorder_level %}table-warning{% endif %}">
+          <td class="fw-semibold">{{ d.generic_name }}</td>
+          <td class="small text-muted">{{ d.brand_name or '—' }}</td>
+          <td class="small">{{ d.form or '—' }}</td>
+          <td class="fw-bold {% if (d.current_stock or 0) <= d.reorder_level %}text-danger{% else %}text-success{% endif %}">
+            {{ d.current_stock or 0 }} {{ d.unit_of_measure or '' }}
+            {% if (d.current_stock or 0) <= d.reorder_level %}
+            <span class="mc-badge mc-badge-cancelled ms-1">Low</span>
+            {% endif %}
+          </td>
+          <td class="small">{{ d.reorder_level }}</td>
+          <td class="small">₹{{ "{:.2f}".format(d.mrp or 0) }}</td>
+          <td><span class="mc-badge {% if d.is_active %}mc-badge-active{% else %}mc-badge-inactive{% endif %}">{{ 'Active' if d.is_active else 'Inactive' }}</span></td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7" class="text-center text-muted py-4">No stock data available.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{# ── PURCHASE ORDERS ── #}
+{% elif tab == 'purchase' %}
+<div class="mc-page-header">
+  <h1 class="mc-page-title"><i class="bi bi-cart-plus"></i> Purchase Orders</h1>
+</div>
+<div class="mc-card">
+  <div class="mc-card-body p-0 mc-table-wrap">
+    <table class="mc-table mc-datatable">
+      <thead><tr><th>PO Number</th><th>Supplier</th><th>PO Date</th><th>Expected</th><th>Total Amount</th><th>Status</th><th>Action</th></tr></thead>
+      <tbody>
+        {% for po in pos.items %}
+        <tr>
+          <td><span class="mc-uhid">{{ po.po_number }}</span></td>
+          <td class="fw-semibold">{{ po.supplier.name if po.supplier else '—' }}</td>
+          <td class="small">{{ po.po_date.strftime('%d-%m-%Y') if po.po_date else '—' }}</td>
+          <td class="small text-muted">{{ po.expected_date.strftime('%d-%m-%Y') if po.expected_date else '—' }}</td>
+          <td class="fw-bold">₹{{ "{:,.2f}".format(po.total_amount or 0) }}</td>
+          <td><span class="mc-badge mc-badge-{% if po.status=='received' %}done{% elif po.status=='sent' %}review{% elif po.status=='cancelled' %}cancelled{% else %}old{% endif %}">{{ po.status|title }}</span></td>
+          <td>
+            {% if po.status == 'draft' %}
+            <form method="POST" action="{{ url_for('pharmacy.po_send', po_id=po.id) }}" class="d-inline">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button type="submit" class="btn btn-sm btn-outline-primary" data-confirm="Mark PO as sent to supplier?"><i class="bi bi-send me-1"></i>Send</button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7" class="text-center text-muted py-4">No purchase orders yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{# ── GRN ── #}
+{% elif tab == 'grn' %}
+<div class="mc-page-header">
+  <h1 class="mc-page-title"><i class="bi bi-box-seam"></i> Goods Received Notes</h1>
+</div>
+<div class="mc-card">
+  <div class="mc-card-body p-0 mc-table-wrap">
+    <table class="mc-table mc-datatable">
+      <thead><tr><th>GRN Number</th><th>Supplier</th><th>GRN Date</th><th>Invoice No.</th><th>Total Amount</th><th>Received By</th></tr></thead>
+      <tbody>
+        {% for g in grns.items %}
+        <tr>
+          <td><span class="mc-uhid">{{ g.grn_number }}</span></td>
+          <td class="fw-semibold">{{ g.supplier.name if g.supplier else '—' }}</td>
+          <td class="small">{{ g.grn_date.strftime('%d-%m-%Y') if g.grn_date else '—' }}</td>
+          <td class="small text-muted">{{ g.invoice_number or '—' }}</td>
+          <td class="fw-bold">₹{{ "{:,.2f}".format(g.total_amount or 0) }}</td>
+          <td class="small text-muted">{{ g.received.full_name if g.received else '—' }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6" class="text-center text-muted py-4">No GRN entries yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{# ── DISPENSING ── #}
+{% elif tab == 'dispensing' %}
+<div class="mc-page-header">
+  <h1 class="mc-page-title"><i class="bi bi-prescription2"></i> Dispensing Records</h1>
+</div>
+<div class="mc-card">
+  <div class="mc-card-body p-0 mc-table-wrap">
+    <table class="mc-table mc-datatable">
+      <thead><tr><th>Dispense No.</th><th>Patient</th><th>Date/Time</th><th>Total</th><th>Discount</th><th>Net Amount</th><th>Billed</th></tr></thead>
+      <tbody>
+        {% for d in dispensings.items %}
+        <tr>
+          <td><span class="mc-uhid">{{ d.dispense_number }}</span></td>
+          <td class="fw-semibold">{{ d.patient.full_name if d.patient else '—' }}</td>
+          <td class="small">{{ d.dispensed_at.strftime('%d-%m-%Y %H:%M') if d.dispensed_at else '—' }}</td>
+          <td>₹{{ "{:,.2f}".format(d.total_amount or 0) }}</td>
+          <td class="text-warning">₹{{ "{:,.2f}".format(d.discount_amount or 0) }}</td>
+          <td class="fw-bold text-success">₹{{ "{:,.2f}".format(d.net_amount or 0) }}</td>
+          <td>{% if d.is_billed %}<span class="mc-badge mc-badge-done">Yes</span>{% else %}<span class="mc-badge mc-badge-review">No</span>{% endif %}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7" class="text-center text-muted py-4">No dispensing records yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{# ── EXPIRY ALERTS ── #}
+{% elif tab == 'expiry' %}
+<div class="mc-page-header">
+  <h1 class="mc-page-title"><i class="bi bi-clock-history"></i> Expiry Alerts</h1>
+</div>
+{% if expired %}
+<div class="alert alert-danger mb-3"><i class="bi bi-exclamation-triangle-fill me-2"></i><strong>{{ expired|length }} batch(es) already expired!</strong> Please write off or return to supplier.</div>
+{% endif %}
+<div class="mc-card mb-3">
+  <div class="mc-card-header text-warning"><i class="bi bi-exclamation-triangle"></i> Expiring within {{ cutoff_days }} days ({{ expiring|length }} batches)</div>
+  <div class="mc-card-body p-0 mc-table-wrap">
+    <table class="mc-table">
+      <thead><tr><th>Drug</th><th>Brand</th><th>Batch No.</th><th>Expiry Date</th><th>Qty</th><th>Days Left</th></tr></thead>
+      <tbody>
+        {% for item in expiring %}
+        {% set days_left = (item.expiry_date - today).days %}
+        <tr class="{% if days_left < 30 %}table-danger{% elif days_left < 60 %}table-warning{% endif %}">
+          <td class="fw-semibold">{{ item.drug.generic_name if item.drug else '—' }}</td>
+          <td class="small text-muted">{{ item.drug.brand_name if item.drug else '—' }}</td>
+          <td><span class="mc-uhid">{{ item.batch_number or '—' }}</span></td>
+          <td class="small fw-bold {% if days_left < 30 %}text-danger{% elif days_left < 60 %}text-warning{% endif %}">{{ item.expiry_date.strftime('%d-%m-%Y') }}</td>
+          <td>{{ item.qty_received }}</td>
+          <td class="fw-bold">{{ days_left }} days</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6" class="text-center text-success py-3"><i class="bi bi-check-circle me-2"></i>No drugs expiring within {{ cutoff_days }} days.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% if expired %}
+<div class="mc-card">
+  <div class="mc-card-header text-danger"><i class="bi bi-x-circle"></i> Already Expired ({{ expired|length }})</div>
+  <div class="mc-card-body p-0 mc-table-wrap">
+    <table class="mc-table">
+      <thead><tr><th>Drug</th><th>Batch No.</th><th>Expired On</th><th>Qty</th></tr></thead>
+      <tbody>
+        {% for item in expired %}
+        <tr class="table-danger">
+          <td class="fw-semibold">{{ item.drug.generic_name if item.drug else '—' }}</td>
+          <td><span class="mc-uhid">{{ item.batch_number or '—' }}</span></td>
+          <td class="small fw-bold text-danger">{{ item.expiry_date.strftime('%d-%m-%Y') }}</td>
+          <td>{{ item.qty_received }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+{# ── SUPPLIERS ── #}
+{% elif tab == 'suppliers' %}
+<div class="mc-page-header">
+  <h1 class="mc-page-title"><i class="bi bi-truck"></i> Suppliers</h1>
+</div>
+<div class="mc-card">
+  <div class="mc-card-body p-0 mc-table-wrap">
+    <table class="mc-table mc-datatable">
+      <thead><tr><th>Code</th><th>Supplier Name</th><th>Contact</th><th>Phone</th><th>Email</th><th>GSTIN</th><th>Drug License</th><th>Status</th></tr></thead>
+      <tbody>
+        {% for s in suppliers.items %}
+        <tr>
+          <td><span class="mc-uhid">{{ s.supplier_code or '—' }}</span></td>
+          <td class="fw-semibold">{{ s.name }}</td>
+          <td class="small text-muted">{{ s.contact_name or '—' }}</td>
+          <td class="small">{{ s.phone or '—' }}</td>
+          <td class="small">{{ s.email or '—' }}</td>
+          <td class="small text-muted">{{ s.gstin or '—' }}</td>
+          <td class="small text-muted">{{ s.drug_license or '—' }}</td>
+          <td><span class="mc-badge {% if s.is_active %}mc-badge-active{% else %}mc-badge-inactive{% endif %}">{{ 'Active' if s.is_active else 'Inactive' }}</span></td>
+        </tr>
+        {% else %}
+        <tr><td colspan="8" class="text-center text-muted py-4">No suppliers registered.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+{# ═══════════ MODALS ═══════════ #}
+
+{# Add Drug Modal #}
+<div class="modal fade" id="addDrugModal" tabindex="-1">
+<div class="modal-dialog modal-lg"><div class="modal-content">
+<div class="modal-header"><h5 class="modal-title" id="drugModalTitle">Add Drug</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+<form method="POST" action="{{ url_for('pharmacy.drug_save') }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+<input type="hidden" name="drug_id" id="drugEditId">
+<div class="modal-body">
+  <div class="row g-3">
+    <div class="col-md-6"><label class="mc-label required">Generic Name</label><input type="text" name="generic_name" id="drugGeneric" class="form-control" required></div>
+    <div class="col-md-6"><label class="mc-label">Brand Name</label><input type="text" name="brand_name" id="drugBrand" class="form-control"></div>
+    <div class="col-md-4"><label class="mc-label">Category</label>
+      <select name="category_id" class="form-select">
+        <option value="">— Select —</option>
+        {% for c in categories or [] %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="col-md-4"><label class="mc-label">Strength</label><input type="text" name="strength" id="drugStrength" class="form-control" placeholder="500mg, 5mg/5ml"></div>
+    <div class="col-md-4"><label class="mc-label">Form</label>
+      <select name="form" class="form-select">
+        <option value="">— Select —</option>
+        {% for f in ['Tablet','Capsule','Syrup','Injection','Drops','Cream','Ointment','Inhaler','Patch','Powder','Gel'] %}
+        <option>{{ f }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="col-md-3"><label class="mc-label">Schedule</label>
+      <select name="schedule" class="form-select">
+        <option value="">—</option>
+        {% for s in ['OTC','H','H1','X','G','J'] %}<option>{{ s }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="col-md-3"><label class="mc-label">Unit</label><input type="text" name="unit_of_measure" class="form-control" placeholder="Tablet, ml, Strip"></div>
+    <div class="col-md-2"><label class="mc-label">GST %</label><input type="number" name="gst_percent" id="drugGst" class="form-control" value="12" step="0.01"></div>
+    <div class="col-md-2"><label class="mc-label">Reorder</label><input type="number" name="reorder_level" id="drugReorder" class="form-control" value="10"></div>
+    <div class="col-md-2"><label class="mc-label">HSN Code</label><input type="text" name="hsn_code" class="form-control"></div>
+    <div class="col-md-4"><label class="mc-label">Purchase Rate (₹)</label><input type="number" name="purchase_rate" id="drugPurchase" class="form-control" step="0.01" value="0"></div>
+    <div class="col-md-4"><label class="mc-label">Sale Rate (₹)</label><input type="number" name="sale_rate" id="drugRate" class="form-control" step="0.01" value="0"></div>
+    <div class="col-md-4"><label class="mc-label">MRP (₹)</label><input type="number" name="mrp" id="drugMrp" class="form-control" step="0.01" value="0"></div>
+  </div>
+</div>
+<div class="modal-footer">
+  <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+  <button type="submit" class="btn btn-primary"><i class="bi bi-check-circle me-1"></i>Save Drug</button>
+</div>
+</form>
+</div></div></div>
+
+{# Add Supplier Modal #}
+<div class="modal fade" id="addSupModal" tabindex="-1">
+<div class="modal-dialog"><div class="modal-content">
+<div class="modal-header"><h5 class="modal-title">Add Supplier</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+<form method="POST" action="{{ url_for('pharmacy.supplier_save') }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+<div class="modal-body">
+  <div class="row g-3">
+    <div class="col-12"><label class="mc-label required">Supplier Name</label><input type="text" name="name" class="form-control" required></div>
+    <div class="col-md-6"><label class="mc-label">Contact Person</label><input type="text" name="contact_name" class="form-control"></div>
+    <div class="col-md-6"><label class="mc-label">Phone</label><input type="tel" name="phone" class="form-control"></div>
+    <div class="col-md-6"><label class="mc-label">Email</label><input type="email" name="email" class="form-control"></div>
+    <div class="col-md-6"><label class="mc-label">GSTIN</label><input type="text" name="gstin" class="form-control"></div>
+    <div class="col-md-6"><label class="mc-label">Drug License No.</label><input type="text" name="drug_license" class="form-control"></div>
+    <div class="col-12"><label class="mc-label">Address</label><textarea name="address" class="form-control" rows="2"></textarea></div>
+  </div>
+</div>
+<div class="modal-footer">
+  <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+  <button type="submit" class="btn btn-primary">Save Supplier</button>
+</div>
+</form>
+</div></div></div>
+
+{# New PO Modal #}
+<div class="modal fade" id="addPOModal" tabindex="-1">
+<div class="modal-dialog modal-xl"><div class="modal-content">
+<div class="modal-header"><h5 class="modal-title">New Purchase Order</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+<form method="POST" action="{{ url_for('pharmacy.po_save') }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+<div class="modal-body">
+  <div class="row g-3 mb-3">
+    <div class="col-md-4"><label class="mc-label required">Supplier</label>
+      <select name="supplier_id" class="form-select" required>
+        <option value="">— Select —</option>
+        {% for s in suppliers or [] %}<option value="{{ s.id }}">{{ s.name }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="col-md-3"><label class="mc-label required">PO Date</label><input type="date" name="po_date" class="form-control" value="{{ today.isoformat() }}" required></div>
+    <div class="col-md-3"><label class="mc-label">Expected Delivery</label><input type="date" name="expected_date" class="form-control"></div>
+    <div class="col-12"><label class="mc-label">Notes</label><input type="text" name="notes" class="form-control" placeholder="Optional notes to supplier"></div>
+  </div>
+  <table class="mc-table" id="poItemsTable">
+    <thead><tr><th>Drug</th><th>Qty</th><th>Unit Rate (₹)</th><th>GST %</th><th>Total</th><th></th></tr></thead>
+    <tbody id="poItems"></tbody>
+  </table>
+  <button type="button" class="btn btn-outline-primary btn-sm mt-2" id="addPOItem"><i class="bi bi-plus-circle me-1"></i>Add Item</button>
+</div>
+<div class="modal-footer">
+  <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+  <button type="submit" class="btn btn-primary">Create PO</button>
+</div>
+</form>
+</div></div></div>
+
+{# New GRN Modal #}
+<div class="modal fade" id="addGRNModal" tabindex="-1">
+<div class="modal-dialog modal-xl"><div class="modal-content">
+<div class="modal-header"><h5 class="modal-title">New GRN — Goods Received</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+<form method="POST" action="{{ url_for('pharmacy.grn_save') }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+<div class="modal-body">
+  <div class="row g-3 mb-3">
+    <div class="col-md-3"><label class="mc-label required">Supplier</label>
+      <select name="supplier_id" class="form-select" required>
+        <option value="">— Select —</option>
+        {% for s in suppliers or [] %}<option value="{{ s.id }}">{{ s.name }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="col-md-3"><label class="mc-label">Against PO</label>
+      <select name="po_id" class="form-select">
+        <option value="">— Direct Purchase —</option>
+        {% for p in pos or [] %}<option value="{{ p.id }}">{{ p.po_number }} ({{ p.supplier.name if p.supplier else '' }})</option>{% endfor %}
+      </select>
+    </div>
+    <div class="col-md-2"><label class="mc-label required">GRN Date</label><input type="date" name="grn_date" class="form-control" value="{{ today.isoformat() }}" required></div>
+    <div class="col-md-2"><label class="mc-label">Invoice No.</label><input type="text" name="invoice_number" class="form-control"></div>
+  </div>
+  <table class="mc-table" id="grnItemsTable">
+    <thead><tr><th>Drug</th><th>Batch No.</th><th>Expiry Date</th><th>Qty</th><th>Purchase Rate</th><th>MRP</th><th>Total</th><th></th></tr></thead>
+    <tbody id="grnItems"></tbody>
+  </table>
+  <button type="button" class="btn btn-outline-primary btn-sm mt-2" id="addGRNItem"><i class="bi bi-plus-circle me-1"></i>Add Item</button>
+</div>
+<div class="modal-footer">
+  <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+  <button type="submit" class="btn btn-primary"><i class="bi bi-box-seam me-1"></i>Save GRN & Update Stock</button>
+</div>
+</form>
+</div></div></div>
+
+{# Dispense Modal #}
+<div class="modal fade" id="dispenseModal" tabindex="-1">
+<div class="modal-dialog modal-xl"><div class="modal-content">
+<div class="modal-header"><h5 class="modal-title">Dispense Medicines</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+<form method="POST" action="{{ url_for('pharmacy.dispense_save') }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+<div class="modal-body">
+  <div class="row g-3 mb-3">
+    <div class="col-md-5">
+      <label class="mc-label required">Patient</label>
+      <div class="position-relative">
+        <input type="text" id="patient-search" class="form-control" placeholder="Search patient…" autocomplete="off">
+        <input type="hidden" name="patient_id" id="patient-id-field" required>
+        <div id="patient-results" class="position-absolute w-100 bg-white border rounded shadow-sm" style="display:none;z-index:2000;max-height:200px;overflow-y:auto"></div>
+      </div>
+    </div>
+    <div class="col-md-4"><label class="mc-label">Discount (₹)</label><input type="number" name="discount_amount" class="form-control" value="0" step="0.01"></div>
+  </div>
+  <table class="mc-table" id="dispItems">
+    <thead><tr><th>Drug</th><th>Stock</th><th>Qty</th><th>Rate (₹)</th><th>Amount</th><th></th></tr></thead>
+    <tbody id="dispBody"></tbody>
+  </table>
+  <button type="button" class="btn btn-outline-primary btn-sm mt-2" id="addDispItem"><i class="bi bi-plus-circle me-1"></i>Add Drug</button>
+</div>
+<div class="modal-footer">
+  <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+  <button type="submit" class="btn btn-primary"><i class="bi bi-check-circle me-1"></i>Confirm Dispensing</button>
+</div>
+</form>
+</div></div></div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Drug drug options for PO/GRN/Dispense
+const allDrugs = {{ (drugs.items | map(attribute='id') | list) | tojson if drugs else '[]' }};
+
+// Edit drug - populate modal
+document.querySelectorAll('.edit-drug-btn').forEach(btn => {
+  btn.addEventListener('click', function() {
+    document.getElementById('drugModalTitle').textContent = 'Edit Drug';
+    document.getElementById('drugEditId').value    = this.dataset.id;
+    document.getElementById('drugGeneric').value   = this.dataset.generic;
+    document.getElementById('drugBrand').value     = this.dataset.brand;
+    document.getElementById('drugStrength').value  = this.dataset.strength;
+    document.getElementById('drugMrp').value       = this.dataset.mrp;
+    document.getElementById('drugRate').value      = this.dataset.rate;
+    document.getElementById('drugPurchase').value  = this.dataset.purchase;
+    document.getElementById('drugGst').value       = this.dataset.gst;
+    document.getElementById('drugReorder').value   = this.dataset.reorder;
+    new bootstrap.Modal(document.getElementById('addDrugModal')).show();
+  });
+});
+document.getElementById('addDrugModal').addEventListener('hidden.bs.modal', function() {
+  document.getElementById('drugModalTitle').textContent = 'Add Drug';
+  document.getElementById('drugEditId').value = '';
+  this.querySelector('form').reset();
+});
+
+// PO item row
+const drugSelect = `<select name="po_drug_id[]" class="form-select form-select-sm" required><option value="">— Select Drug —</option>{{ (drugs.items | map(attribute='id') | list) | tojson }}</select>`;
+function mkDrugSelect(nameAttr) {
+  return `<select name="${nameAttr}" class="form-select form-select-sm" required>
+    <option value="">— Select Drug —</option>
+    {% for d in drugs.items if drugs else [] %}
+    <option value="{{ d.id }}" data-rate="{{ d.purchase_rate or 0 }}" data-mrp="{{ d.mrp or 0 }}" data-stock="{{ d.current_stock or 0 }}">{{ d.generic_name }}{% if d.brand_name %} ({{ d.brand_name }}){% endif %} — Stock: {{ d.current_stock or 0 }}</option>
+    {% endfor %}
+  </select>`;
+}
+
+// PO items
+document.getElementById('addPOItem').addEventListener('click', function() {
+  const tr = document.createElement('tr');
+  tr.innerHTML = `<td>${mkDrugSelect('po_drug_id[]')}</td>
+    <td><input type="number" name="po_qty[]" class="form-control form-control-sm po-qty" value="1" min="1" style="width:70px"></td>
+    <td><input type="number" name="po_rate[]" class="form-control form-control-sm po-rate" value="0" step="0.01" style="width:90px"></td>
+    <td><input type="number" name="po_gst[]" class="form-control form-control-sm" value="12" step="0.01" style="width:65px"></td>
+    <td class="po-total fw-semibold">₹0.00</td>
+    <td><button type="button" class="btn btn-icon btn-outline-danger btn-sm rm"><i class="bi bi-trash"></i></button></td>`;
+  document.getElementById('poItems').appendChild(tr);
+  tr.querySelectorAll('.po-qty,.po-rate').forEach(i => i.addEventListener('input', () => {
+    const qty = parseFloat(tr.querySelector('.po-qty').value)||0;
+    const rate = parseFloat(tr.querySelector('.po-rate').value)||0;
+    tr.querySelector('.po-total').textContent = '₹'+(qty*rate).toFixed(2);
+  }));
+  tr.querySelector('.rm').addEventListener('click', () => tr.remove());
+});
+
+// GRN items
+document.getElementById('addGRNItem').addEventListener('click', function() {
+  const tr = document.createElement('tr');
+  tr.innerHTML = `<td>${mkDrugSelect('grn_drug_id[]')}</td>
+    <td><input type="text" name="grn_batch[]" class="form-control form-control-sm" placeholder="Batch No." style="width:100px"></td>
+    <td><input type="date" name="grn_expiry[]" class="form-control form-control-sm" style="width:130px"></td>
+    <td><input type="number" name="grn_qty[]" class="form-control form-control-sm grn-qty" value="1" min="1" style="width:70px"></td>
+    <td><input type="number" name="grn_rate[]" class="form-control form-control-sm grn-rate" value="0" step="0.01" style="width:90px"></td>
+    <td><input type="number" name="grn_mrp[]" class="form-control form-control-sm" value="0" step="0.01" style="width:90px"></td>
+    <td class="grn-total fw-semibold">₹0.00</td>
+    <td><button type="button" class="btn btn-icon btn-outline-danger btn-sm rm"><i class="bi bi-trash"></i></button></td>`;
+  document.getElementById('grnItems').appendChild(tr);
+  tr.querySelectorAll('.grn-qty,.grn-rate').forEach(i => i.addEventListener('input', () => {
+    const q = parseFloat(tr.querySelector('.grn-qty').value)||0;
+    const r = parseFloat(tr.querySelector('.grn-rate').value)||0;
+    tr.querySelector('.grn-total').textContent = '₹'+(q*r).toFixed(2);
+  }));
+  tr.querySelector('.rm').addEventListener('click', () => tr.remove());
+});
+
+// Dispense items
+document.getElementById('addDispItem').addEventListener('click', function() {
+  const tr = document.createElement('tr');
+  tr.innerHTML = `<td>${mkDrugSelect('disp_drug_id[]')}</td>
+    <td class="disp-stock small text-muted">—</td>
+    <td><input type="number" name="disp_qty[]" class="form-control form-control-sm" value="1" min="1" style="width:70px"></td>
+    <td><input type="number" name="disp_rate[]" class="form-control form-control-sm disp-rate" value="0" step="0.01" style="width:90px"></td>
+    <td class="disp-amt fw-semibold">₹0.00</td>
+    <td><button type="button" class="btn btn-icon btn-outline-danger btn-sm rm"><i class="bi bi-trash"></i></button></td>`;
+  document.getElementById('dispBody').appendChild(tr);
+  const sel = tr.querySelector('select');
+  sel.addEventListener('change', function() {
+    const opt = this.options[this.selectedIndex];
+    tr.querySelector('.disp-stock').textContent = 'Stock: '+(opt.dataset.stock||0);
+    tr.querySelector('.disp-rate').value = opt.dataset.rate||0;
+  });
+  tr.querySelector('.rm').addEventListener('click', () => tr.remove());
+});
+</script>
+{% endblock %}

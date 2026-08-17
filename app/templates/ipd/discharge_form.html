@@ -1,0 +1,66 @@
+{% extends "shared/base.html" %}
+{% block title %}Discharge — {{ adm.ip_number }}{% endblock %}
+{% block content %}
+<div class="mc-page-header">
+  <div>
+    <h1 class="mc-page-title"><i class="bi bi-box-arrow-right"></i> Discharge Summary — {{ adm.ip_number }}</h1>
+    <div class="mc-breadcrumb"><a href="{{ url_for('ipd.index', tab='discharge') }}">IPD</a> / Discharge</div>
+  </div>
+</div>
+<form method="POST" action="{{ url_for('ipd.discharge', adm_id=adm.id) }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+<div class="row g-3">
+  <div class="col-lg-8">
+    <div class="mc-card mb-3"><div class="mc-card-header"><i class="bi bi-person-vcard"></i> Patient</div>
+    <div class="mc-card-body"><div class="row"><div class="col-md-6"><dl class="row mb-0 small">
+      <dt class="col-5 text-muted">Name</dt><dd class="col-7 fw-semibold">{{ patient.full_name if patient else '—' }}</dd>
+      <dt class="col-5 text-muted">UHID</dt><dd class="col-7"><span class="mc-uhid">{{ patient.uhid if patient else '—' }}</span></dd>
+      <dt class="col-5 text-muted">IP Number</dt><dd class="col-7"><span class="mc-uhid">{{ adm.ip_number }}</span></dd>
+    </dl></div><div class="col-md-6"><dl class="row mb-0 small">
+      <dt class="col-5 text-muted">Doctor</dt><dd class="col-7">{{ doctor.full_name if doctor else '—' }}</dd>
+      <dt class="col-5 text-muted">Admitted</dt><dd class="col-7">{{ adm.admission_date.strftime('%d %b %Y') if adm.admission_date else '—' }}</dd>
+      <dt class="col-5 text-muted">Days</dt><dd class="col-7 fw-bold">{% if adm.admission_date %}{{ (today - adm.admission_date.date()).days + 1 }}{% endif %}</dd>
+    </dl></div></div></div></div>
+
+    <div class="mc-card mb-3"><div class="mc-card-header"><i class="bi bi-clipboard2-pulse"></i> Clinical Summary</div>
+    <div class="mc-card-body">
+      <div class="row g-3">
+        <div class="col-md-6"><label class="mc-label">Admission Diagnosis</label><textarea name="admission_diagnosis" class="form-control" rows="2">{{ summary.admission_diagnosis if summary else adm.provisional_diagnosis or '' }}</textarea></div>
+        <div class="col-md-6"><label class="mc-label required">Final Diagnosis</label><textarea name="final_diagnosis" class="form-control" rows="2" required>{{ summary.final_diagnosis if summary else '' }}</textarea></div>
+        <div class="col-md-6"><label class="mc-label">Procedures Done</label><textarea name="procedures_done" class="form-control" rows="2">{{ summary.procedures_done if summary else '' }}</textarea></div>
+        <div class="col-md-6"><label class="mc-label">Investigations</label><textarea name="investigations" class="form-control" rows="2">{{ summary.investigations if summary else '' }}</textarea></div>
+        <div class="col-12"><label class="mc-label">Treatment Given</label><textarea name="treatment_given" class="form-control" rows="3">{{ summary.treatment_given if summary else '' }}</textarea></div>
+        <div class="col-12"><label class="mc-label">Medications on Discharge</label><textarea name="medications_on_discharge" class="form-control" rows="2" placeholder="List drugs with doses…">{{ summary.medications_on_discharge if summary else '' }}</textarea></div>
+        <div class="col-12"><label class="mc-label">Discharge Advice</label><textarea name="discharge_advice" class="form-control" rows="2">{{ summary.discharge_advice if summary else '' }}</textarea></div>
+        <div class="col-md-4"><label class="mc-label">Follow-Up Date</label><input type="date" name="follow_up_date" class="form-control" value="{{ summary.follow_up_date.isoformat() if summary and summary.follow_up_date else '' }}"></div>
+        <div class="col-md-8"><label class="mc-label">Follow-Up Instructions</label><input type="text" name="follow_up_instructions" class="form-control" value="{{ summary.follow_up_instructions if summary else '' }}"></div>
+      </div>
+    </div></div>
+  </div>
+
+  <div class="col-lg-4">
+    <div class="mc-card mb-3"><div class="mc-card-header"><i class="bi bi-clipboard-check"></i> Discharge Details</div>
+    <div class="mc-card-body">
+      <div class="mb-3"><label class="mc-label">Discharge Type</label>
+        <select name="discharge_type" class="form-select">
+          {% for dt in [('regular','Regular'),('against_advice','Against Medical Advice'),('transfer','Transfer'),('death','Death')] %}
+          <option value="{{ dt[0] }}">{{ dt[1] }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="mb-3"><label class="mc-label">Condition on Discharge</label>
+        <select name="condition_on_discharge" class="form-select">
+          {% for c in ['stable','improved','critical','unchanged','deceased'] %}
+          <option value="{{ c }}">{{ c|title }}</option>{% endfor %}
+        </select>
+      </div>
+    </div></div>
+    <div class="mc-card"><div class="mc-card-body d-grid gap-2">
+      <button type="submit" class="btn btn-success py-2" data-confirm="Confirm discharge? Bed will be released.">
+        <i class="bi bi-box-arrow-right me-1"></i>Discharge Patient
+      </button>
+      <a href="{{ url_for('ipd.index', tab='discharge') }}" class="btn btn-outline-secondary">Cancel</a>
+    </div></div>
+  </div>
+</div>
+</form>
+{% endblock %}

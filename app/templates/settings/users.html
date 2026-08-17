@@ -1,0 +1,59 @@
+{% extends "shared/base.html" %}
+{% block title %}Users{% endblock %}
+
+{% block content %}
+<div class="mc-page-header">
+  <h1 class="mc-page-title"><i class="bi bi-person-badge me-2"></i>Users <small>{{ users|length }} total</small></h1>
+  <a href="{{ url_for('settings.user_new') }}" class="btn btn-primary btn-sm">
+    <i class="bi bi-person-plus me-1"></i>New User
+  </a>
+</div>
+
+<div class="mc-card">
+  <div class="mc-card-body p-0">
+    <div class="mc-table-wrapper">
+      <table class="mc-table mc-datatable">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Username</th>
+            <th>Email</th>
+            <th>Role</th>
+            <th>Branch</th>
+            <th>Last Login</th>
+            <th>Status</th>
+            <th class="text-end">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for u in users %}
+          <tr>
+            <td class="fw-semibold">{{ u.full_name }}
+              {% if u.is_superadmin %}<span class="badge bg-danger ms-1" style="font-size:.6rem">SA</span>{% endif %}
+            </td>
+            <td><code>{{ u.username }}</code></td>
+            <td class="small">{{ u.email }}</td>
+            <td>{{ u.role.name if u.role else '—' }}</td>
+            <td>{{ u.branch.code if u.branch else 'All' }}</td>
+            <td class="small text-muted">
+              {{ u.last_login.strftime('%d %b %Y %H:%M') if u.last_login else 'Never' }}
+            </td>
+            <td>
+              {% if u.is_active %}<span class="badge bg-success">Active</span>
+              {% else %}<span class="badge bg-secondary">Inactive</span>{% endif %}
+              {% if u.must_change_pwd %}<span class="badge bg-warning text-dark ms-1" style="font-size:.6rem">PWD</span>{% endif %}
+            </td>
+            <td class="text-end">
+              <a href="{{ url_for('settings.user_edit', user_id=u.id) }}"
+                 class="btn btn-sm btn-outline-secondary">
+                <i class="bi bi-pencil"></i>
+              </a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

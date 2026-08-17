@@ -1,0 +1,157 @@
+{% extends "shared/base.html" %}
+{% block title %}Patients{% endblock %}
+
+{% block content %}
+<div class="mc-page-header">
+  <div>
+    <h1 class="mc-page-title"><i class="bi bi-people me-2"></i>Patients
+      <small>{{ patients.total }} records</small>
+    </h1>
+    <div class="mc-breadcrumb">Patient Management</div>
+  </div>
+  <div class="d-flex gap-2 flex-wrap">
+    {% if current_user.has_permission('patients','create') %}
+    <a href="{{ url_for('patients.bulk_upload') }}" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-upload me-1"></i>Bulk Upload
+    </a>
+    <a href="{{ url_for('patients.download_template') }}" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-download me-1"></i>Template
+    </a>
+    <a href="{{ url_for('patients.register') }}" class="btn btn-primary btn-sm">
+      <i class="bi bi-person-plus me-1"></i>Register Patient
+    </a>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Search bar -->
+<div class="mc-card mb-3">
+  <div class="mc-card-body py-2">
+    <form method="GET" class="d-flex gap-2 align-items-center">
+      <div class="input-group">
+        <span class="input-group-text"><i class="bi bi-search"></i></span>
+        <input type="text" name="q" class="form-control" placeholder="Search by name, UHID or phone..."
+               value="{{ search }}" autofocus>
+        {% if search %}
+        <a href="{{ url_for('patients.index') }}" class="btn btn-outline-secondary">
+          <i class="bi bi-x"></i>
+        </a>
+        {% endif %}
+      </div>
+      <button type="submit" class="btn btn-primary">Search</button>
+    </form>
+  </div>
+</div>
+
+<!-- Patient Table -->
+<div class="mc-card">
+  <div class="mc-card-body p-0">
+    <div class="mc-table-wrapper">
+      <table class="mc-table">
+        <thead>
+          <tr>
+            <th>UHID</th>
+            <th>Patient Name</th>
+            <th>Age / Gender</th>
+            <th>Phone</th>
+            <th>Blood Group</th>
+            <th>Registered</th>
+            <th>Status</th>
+            <th class="text-end">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in patients.items %}
+          <tr>
+            <td><span class="mc-uhid">{{ p.uhid }}</span></td>
+            <td>
+              <div class="fw-semibold">{{ p.full_name }}</div>
+              {% if p.email %}<div class="text-muted small">{{ p.email }}</div>{% endif %}
+            </td>
+            <td>
+              {{ p.age_years or '' }}{% if p.age_years %}y{% endif %}
+              {% if p.gender %}
+              <span class="badge {% if p.gender == 'Male' %}bg-primary{% elif p.gender == 'Female' %}bg-danger{% else %}bg-secondary{% endif %} ms-1" style="font-size:.65rem">
+                {{ p.gender[0] }}
+              </span>
+              {% endif %}
+            </td>
+            <td>{{ p.phone }}</td>
+            <td>{{ p.blood_group or '—' }}</td>
+            <td class="text-muted small">{{ p.created_at.strftime('%d %b %Y') if p.created_at }}</td>
+            <td>
+              {% if p.is_active %}
+              <span class="badge bg-success">Active</span>
+              {% else %}
+              <span class="badge bg-secondary">Inactive</span>
+              {% endif %}
+            </td>
+            <td class="text-end">
+              <div class="d-flex gap-1 justify-content-end">
+                <a href="{{ url_for('patients.view', patient_id=p.id) }}"
+                   class="btn btn-sm btn-outline-primary" title="View">
+                  <i class="bi bi-eye"></i>
+                </a>
+                {% if current_user.has_permission('patients','edit') %}
+                <a href="{{ url_for('patients.edit', patient_id=p.id) }}"
+                   class="btn btn-sm btn-outline-secondary" title="Edit">
+                  <i class="bi bi-pencil"></i>
+                </a>
+                {% endif %}
+                {% if current_user.has_permission('patients','delete') %}
+                <form method="POST" action="{{ url_for('patients.delete', patient_id=p.id) }}" class="d-inline">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <button type="submit" class="btn btn-sm btn-outline-danger"
+                          data-confirm="Deactivate this patient record?" title="Deactivate">
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </form>
+                {% endif %}
+              </div>
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="8" class="text-center text-muted py-4">
+              <i class="bi bi-person-x display-6 d-block mb-2"></i>
+              {% if search %}No patients found for "{{ search }}"{% else %}No patients registered yet{% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Pagination -->
+  {% if patients.pages > 1 %}
+  <div class="mc-card-body border-top">
+    <div class="mc-pagination">
+      <div class="mc-pagination-info">
+        Showing {{ patients.per_page * (patients.page - 1) + 1 }}–{{ [patients.per_page * patients.page, patients.total] | min }}
+        of {{ patients.total }} patients
+      </div>
+      <nav>
+        <ul class="pagination pagination-sm mb-0">
+          <li class="page-item {% if not patients.has_prev %}disabled{% endif %}">
+            <a class="page-link" href="{{ url_for('patients.index', page=patients.prev_num, q=search) }}">‹</a>
+          </li>
+          {% for p in patients.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+            {% if p %}
+            <li class="page-item {% if p == patients.page %}active{% endif %}">
+              <a class="page-link" href="{{ url_for('patients.index', page=p, q=search) }}">{{ p }}</a>
+            </li>
+            {% else %}
+            <li class="page-item disabled"><span class="page-link">…</span></li>
+            {% endif %}
+          {% endfor %}
+          <li class="page-item {% if not patients.has_next %}disabled{% endif %}">
+            <a class="page-link" href="{{ url_for('patients.index', page=patients.next_num, q=search) }}">›</a>
+          </li>
+        </ul>
+      </nav>
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

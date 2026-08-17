@@ -1,326 +1,91 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Lab Report — {{ order.order_number }}</title>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-<style>
-:root{--p:#3d1a78;--pm:#5b21b6;--border:#e9d5ff}
-*{font-family:'DM Sans',sans-serif;box-sizing:border-box}
-body{background:#f8f5ff;color:#1f2937;margin:0}
-.mc-subnav{display:flex;align-items:center;background:#fff;border-bottom:2px solid var(--border);
-  padding:0 8px;min-height:44px}
-.mc-subnav-item{padding:10px 14px;font-size:.8rem;font-weight:500;color:#6b7280;
-  text-decoration:none;border-bottom:2px solid transparent;white-space:nowrap}
-.mc-subnav-item.active{color:var(--p);border-bottom-color:var(--p);font-weight:700}
-.mc-card{background:#fff;border:1px solid var(--border);border-radius:12px;overflow:hidden;
-  margin-bottom:16px;box-shadow:0 1px 4px rgba(61,26,120,.06)}
-.mc-card-body{padding:20px}
-
-/* Print styles */
-@media print {
-  .no-print { display:none!important }
-  body { background:#fff!important; margin:0 }
-  .mc-subnav { display:none!important }
-  .mc-card { border:none!important; box-shadow:none!important; margin:0!important }
-  .mc-card-body { padding:0!important }
-  #printArea { margin:0; padding:0 }
-  @page { margin:12mm; size:A4 }
-}
-</style>
-</head>
-<body>
-
-<div class="mc-subnav no-print">
-  <a href="{{ url_for('lab.index', tab='approved') }}" class="mc-subnav-item">
-    <i class="bi bi-arrow-left me-1"></i>Approved Reports
-  </a>
-  <span class="mc-subnav-item active">
-    <i class="bi bi-file-earmark-medical me-1"></i>Lab Report
-  </span>
-  <div class="ms-auto d-flex gap-2 pe-3">
-    {% if order.status == 'resulted' and not order.approval %}
-    <form method="POST"
-          action="{{ url_for('lab.approve_report', order_id=order.id) }}"
-          class="d-inline"
-          onsubmit="return confirm('Approve and lock this report?')">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <input type="hidden" name="approver_note" value="">
-      <button type="submit" class="btn btn-sm btn-success">
-        <i class="bi bi-check-circle me-1"></i>Approve & Lock
-      </button>
-    </form>
-    {% endif %}
-    {% if not order.approval or order.approval.is_unlocked %}
-    <a href="{{ url_for('lab.enter_results', order_id=order.id) }}"
-       class="btn btn-sm btn-outline-secondary">
-      <i class="bi bi-pencil me-1"></i>Edit Results
-    </a>
-    {% endif %}
-    <button class="btn btn-sm btn-outline-primary" onclick="window.print()">
-      <i class="bi bi-printer me-1"></i>Print
-    </button>
+{% extends "shared/base.html" %}
+{% block title %}Lab Report — {{ order.order_number }}{% endblock %}
+{% block content %}
+<div class="mc-page-header">
+  <h1 class="mc-page-title"><i class="bi bi-file-earmark-medical"></i> Lab Report — {{ order.order_number }}</h1>
+  <div class="d-flex gap-2">
+    <button class="btn btn-outline-secondary btn-sm no-print" data-print><i class="bi bi-printer me-1"></i>Print</button>
+    <a href="{{ url_for('lab.index', tab='orders') }}" class="btn btn-outline-secondary btn-sm no-print">← Back</a>
   </div>
 </div>
 
-<div style="padding:16px 20px" id="printArea">
+<!-- Report header -->
+<div class="mc-card mb-3">
+  <div class="mc-card-body">
+    <div class="row g-3">
+      <div class="col-md-8">
+        <div class="fw-bold" style="font-size:1.1rem">{{ branch.name if branch else 'MediCore Hospital' }}</div>
+        <div class="text-muted small">{{ branch.address if branch else '' }}</div>
+        {% if branch %}<div class="text-muted small">Tel: {{ branch.phone or '' }} | {{ branch.email or '' }}</div>{% endif %}
+      </div>
+      <div class="col-md-4 text-end">
+        <div class="fw-bold text-primary" style="font-size:1.1rem">LABORATORY REPORT</div>
+        <div class="small text-muted">Order No: <strong>{{ order.order_number }}</strong></div>
+        <div class="small text-muted">Date: {{ order.ordered_at.strftime('%d-%m-%Y %H:%M') if order.ordered_at else '—' }}</div>
+        <div><span class="mc-badge {% if order.status=='reported' %}mc-badge-done{% else %}mc-badge-review{% endif %}">{{ order.status|replace('_',' ')|title }}</span></div>
+      </div>
+    </div>
+    <hr>
+    <div class="row g-2 small">
+      <div class="col-md-3"><strong>Patient:</strong> {{ patient.full_name if patient else '—' }}</div>
+      <div class="col-md-2"><strong>UHID:</strong> <span class="mc-uhid">{{ patient.uhid if patient else '—' }}</span></div>
+      <div class="col-md-2"><strong>Age/Sex:</strong> {{ patient.age_years or '' }}{% if patient and patient.age_years %}y{% endif %} {{ patient.gender or '' }}</div>
+      <div class="col-md-2"><strong>Phone:</strong> {{ patient.phone if patient else '—' }}</div>
+      <div class="col-md-3"><strong>Ref. Doctor:</strong> {{ doctor.full_name if doctor else '—' }}</div>
+    </div>
+  </div>
+</div>
+
+<!-- Results table -->
 <div class="mc-card">
-<div class="mc-card-body">
-
-  <!-- Hospital Header -->
-  <div style="text-align:center;border-bottom:2px solid #3d1a78;
-              padding-bottom:12px;margin-bottom:14px">
-    <div style="font-weight:800;font-size:1.25rem;color:#3d1a78">
-      {{ branch.name if branch else 'RIVIVE SPECIALITY CARE HOSPITAL' }}
-    </div>
-    <div style="font-size:.78rem;color:#6b7280">ECR, OMR, Thiruporur – 603103</div>
-    {% if branch %}
-    <div style="font-size:.72rem;color:#6b7280">
-      {% if branch.phone %}Tel: {{ branch.phone }}{% endif %}
-      {% if branch.email %} | {{ branch.email }}{% endif %}
-    </div>
-    {% endif %}
-    <div style="font-weight:800;font-size:1rem;color:#3d1a78;
-                letter-spacing:2px;margin-top:6px">
-      LABORATORY REPORT
+  <div class="mc-card-body p-0">
+    <div class="mc-table-wrap">
+      <table class="mc-table">
+        <thead>
+          <tr>
+            <th>Test Name</th><th>Result</th><th>Unit</th>
+            <th>Reference Range</th><th>Flag</th><th>Remarks</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in items %}
+          {% set r = results.get(item.id) %}
+          {% set test = item.test %}
+          <tr class="{% if r and r.is_critical %}table-danger{% elif r and r.is_abnormal %}table-warning{% endif %}">
+            <td class="fw-semibold">{{ test.name if test else '—' }}</td>
+            <td class="fw-bold {% if r and r.is_critical %}text-danger{% elif r and r.is_abnormal %}text-warning{% endif %}">
+              {{ r.result_value if r else '—' }}
+            </td>
+            <td class="small text-muted">{{ (r.result_unit if r else '') or (test.unit if test else '') or '—' }}</td>
+            <td class="small">
+              {% if r and r.reference_range %}{{ r.reference_range }}
+              {% elif test %}{{ test.normal_range or '—' }}{% else %}—{% endif %}
+            </td>
+            <td>
+              {% if r and r.abnormal_flag %}
+              <span class="mc-badge mc-badge-cancelled">{{ r.abnormal_flag }}</span>
+              {% elif r and r.is_abnormal %}
+              <span class="mc-badge mc-badge-review">ABNL</span>
+              {% else %}—{% endif %}
+            </td>
+            <td class="small text-muted">{{ r.remarks if r else '—' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
     </div>
   </div>
-
-  <!-- Patient + Order info -->
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;
-              margin-bottom:14px;font-size:.82rem;
-              border:1px solid #e9d5ff;border-radius:8px;padding:12px">
-    <div>
-      <div style="margin-bottom:3px">
-        <strong>Patient Name:</strong>
-        {{ patient.full_name if patient else '—' }}
+  <div class="mc-card-body border-top" style="font-size:.8rem">
+    <div class="row">
+      <div class="col-md-6">
+        {% set verifier = items[0].results.first().verified_by if items and items[0].results.first() and items[0].results.first().verified_by else none %}
+        <strong>Reported by:</strong> Lab Technician &nbsp;&nbsp;
+        <strong>Verified by:</strong> {{ verifier or '—' }}
       </div>
-      <div style="margin-bottom:3px">
-        <strong>UHID:</strong>
-        <span style="background:#ede9fe;color:#5b21b6;padding:1px 8px;
-                     border-radius:4px;font-family:monospace;font-size:.7rem">
-          {{ patient.uhid if patient else '—' }}
-        </span>
-      </div>
-      <div style="margin-bottom:3px">
-        <strong>Age / Gender:</strong>
-        {{ patient.age_years or '—' }}{% if patient and patient.age_years %}y{% endif %}
-        {% if patient and patient.gender %} / {{ patient.gender }}{% endif %}
-      </div>
-      <div style="margin-bottom:3px">
-        <strong>Phone:</strong> {{ patient.phone if patient else '—' }}
-      </div>
-      {% if order.clinical_info %}
-      <div style="margin-bottom:3px">
-        <strong>Clinical Info:</strong> {{ order.clinical_info }}
-      </div>
-      {% endif %}
-    </div>
-    <div style="text-align:right">
-      <div style="margin-bottom:3px">
-        <strong>Order No:</strong>
-        <span style="background:#ede9fe;color:#5b21b6;padding:1px 8px;
-                     border-radius:4px;font-family:monospace;font-size:.7rem">
-          {{ order.order_number }}
-        </span>
-      </div>
-      <div style="margin-bottom:3px">
-        <strong>Order Date:</strong>
-        {{ order.ordered_at.strftime('%d-%m-%Y %H:%M') }}
-      </div>
-      <div style="margin-bottom:3px">
-        <strong>Ref. Doctor:</strong>
-        {{ doctor.full_name if doctor else '—' }}
-      </div>
-      <div style="margin-bottom:3px">
-        <strong>Priority:</strong>
-        <span style="padding:1px 8px;border-radius:20px;font-size:.7rem;font-weight:700;
-              background:{% if order.priority=='stat' %}#fee2e2;color:#991b1b
-              {% elif order.priority=='urgent' %}#fef3c7;color:#92400e
-              {% else %}#f3f4f6;color:#374151{% endif %}">
-          {{ order.priority|title }}
-        </span>
-      </div>
-      <div style="margin-bottom:3px">
-        <strong>Visit Type:</strong> {{ order.visit_type|upper }}
+      <div class="col-md-6 text-end text-muted">
+        Report generated by MediCore ERP — {{ now.strftime('%d-%m-%Y %H:%M') }}
       </div>
     </div>
   </div>
-
-  <!-- Sample info -->
-  {% if sample %}
-  <div style="background:#f5f0ff;border-radius:6px;padding:8px 14px;
-              margin-bottom:12px;font-size:.78rem;display:flex;gap:20px;flex-wrap:wrap">
-    <span>
-      <strong>Sample Collected:</strong>
-      {{ sample.collected_at.strftime('%d-%m-%Y %H:%M') if sample.collected_at else '—' }}
-    </span>
-    <span>
-      <strong>Phlebotomist:</strong>
-      {{ sample.phlebotomist.full_name if sample.phlebotomist else '—' }}
-    </span>
-    {% if sample.sample_id %}
-    <span><strong>Sample ID:</strong> {{ sample.sample_id }}</span>
-    {% endif %}
-    {% if sample.is_fasting %}
-    <span style="background:#fef3c7;color:#92400e;padding:1px 8px;border-radius:4px;
-                 font-weight:700">FASTING SAMPLE</span>
-    {% endif %}
-    {% if sample.turnaround_minutes is not none %}
-    {% set m = sample.turnaround_minutes %}
-    <span><strong>TAT:</strong> {% if m >= 60 %}{{ m//60 }}h {{ m%60 }}m{% else %}{{ m }}m{% endif %}</span>
-    {% endif %}
-  </div>
-  {% endif %}
-
-  <!-- Results table -->
-  <table style="width:100%;border-collapse:collapse;font-size:.82rem;margin-bottom:14px">
-    <thead>
-      <tr style="background:#3d1a78;color:#fff">
-        <th style="padding:9px 12px;text-align:left;min-width:160px">Test Name</th>
-        <th style="padding:9px 12px;text-align:left;min-width:120px">Result</th>
-        <th style="padding:9px 12px;text-align:left;min-width:60px">Unit</th>
-        <th style="padding:9px 12px;text-align:left;min-width:120px">Reference Range</th>
-        <th style="padding:9px 12px;text-align:left;min-width:80px">Male Range</th>
-        <th style="padding:9px 12px;text-align:left;min-width:80px">Female Range</th>
-        <th style="padding:9px 12px;text-align:center;min-width:80px">Flag</th>
-        <th style="padding:9px 12px;text-align:left">Remarks</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for item in items %}
-      {% set res = item.result %}
-      <tr style="border-bottom:1px solid #f3e8ff;
-                 background:{% if res and res.is_critical %}#fff8f8
-                 {% elif res and res.is_abnormal %}#fffbeb
-                 {% else %}#fff{% endif %}">
-        <td style="padding:9px 12px;font-weight:600">
-          {{ item.test_name }}
-          {% if item.test_code %}
-          <div style="font-size:.65rem;color:#6b7280;font-family:monospace">
-            {{ item.test_code }}
-          </div>
-          {% endif %}
-        </td>
-        <td style="padding:9px 12px;font-weight:700;font-size:.88rem;
-                   color:{% if res and res.is_critical %}#dc2626
-                   {% elif res and res.is_abnormal %}#d97706
-                   {% else %}#1f2937{% endif %}">
-          {{ res.result_value if res else '—' }}
-        </td>
-        <td style="padding:9px 12px;color:#6b7280;font-size:.75rem">
-          {{ res.result_unit if res and res.result_unit
-             else (item.test.unit if item.test else '—') }}
-        </td>
-        <td style="padding:9px 12px;color:#374151;font-size:.75rem">
-          {% if item.test %}
-          {{ item.test.normal_range or item.test.normal_range_text or '—' }}
-          {% else %}—{% endif %}
-        </td>
-        <td style="padding:9px 12px;color:#6b7280;font-size:.75rem">
-          {{ item.test.male_range if item.test else '—' }}
-        </td>
-        <td style="padding:9px 12px;color:#6b7280;font-size:.75rem">
-          {{ item.test.female_range if item.test else '—' }}
-        </td>
-        <td style="padding:9px 12px;text-align:center">
-          {% if res %}
-          {% if res.is_critical %}
-          <span style="background:#fee2e2;color:#991b1b;padding:2px 8px;
-                       border-radius:20px;font-size:.7rem;font-weight:700">
-            ⚠ {{ res.abnormal_flag or 'CRIT' }}
-          </span>
-          {% elif res.is_abnormal %}
-          <span style="background:#fef3c7;color:#92400e;padding:2px 8px;
-                       border-radius:20px;font-size:.7rem;font-weight:700">
-            {{ res.abnormal_flag or 'ABNL' }}
-          </span>
-          {% else %}
-          <span style="background:#d1fae5;color:#065f46;padding:2px 8px;
-                       border-radius:20px;font-size:.7rem;font-weight:600">
-            Normal
-          </span>
-          {% endif %}
-          {% else %}
-          <span style="color:#9ca3af;font-size:.75rem">Pending</span>
-          {% endif %}
-        </td>
-        <td style="padding:9px 12px;color:#6b7280;font-size:.75rem">
-          {{ res.remarks if res and res.remarks else '—' }}
-        </td>
-      </tr>
-      {% if item.test and item.test.print_note %}
-      <tr style="background:#fafafe">
-        <td colspan="8" style="padding:4px 12px;font-size:.7rem;
-                               color:#6b7280;font-style:italic">
-          * {{ item.test.print_note }}
-        </td>
-      </tr>
-      {% endif %}
-      {% endfor %}
-    </tbody>
-  </table>
-
-  <!-- Approval stamp -->
-  <div style="border-top:1px solid #e9d5ff;padding-top:12px;margin-top:4px">
-    {% if approval and not approval.is_unlocked %}
-    <div style="display:flex;justify-content:space-between;
-                align-items:flex-start;font-size:.78rem;flex-wrap:wrap;gap:12px">
-      <div>
-        <div style="font-weight:700;color:#3d1a78;margin-bottom:4px">Report Status</div>
-        <span style="background:#d1fae5;color:#065f46;padding:4px 12px;
-                     border-radius:20px;font-size:.75rem;font-weight:700">
-          ✓ Approved & Locked
-        </span>
-      </div>
-      <div style="text-align:right">
-        <div><strong>Verified By:</strong>
-          {{ approval.approver.full_name if approval.approver else '—' }}
-        </div>
-        <div><strong>Verified At:</strong>
-          {{ approval.approved_at.strftime('%d-%m-%Y %H:%M') if approval.approved_at else '—' }}
-        </div>
-        {% if approval.approver_note %}
-        <div class="text-muted" style="font-size:.72rem">
-          Note: {{ approval.approver_note }}
-        </div>
-        {% endif %}
-      </div>
-    </div>
-    {% elif approval and approval.is_unlocked %}
-    <div style="background:#fef3c7;padding:8px 12px;border-radius:6px;
-                font-size:.78rem;color:#92400e">
-      <i class="bi bi-exclamation-triangle me-1"></i>
-      Report was unlocked for editing by
-      {{ approval.unlocker.full_name if approval.unlocker else '—' }}.
-      Re-approval required.
-    </div>
-    {% else %}
-    <div style="color:#d97706;font-size:.82rem;font-weight:600">
-      <i class="bi bi-clock me-1"></i>Pending Approval
-    </div>
-    {% endif %}
-  </div>
-
-  <!-- Footer -->
-  <div style="margin-top:20px;border-top:1px solid #e9d5ff;padding-top:8px;
-              display:flex;justify-content:space-between;font-size:.7rem;color:#9ca3af">
-    <div>Rivive SCH ERP — Lab Module</div>
-    <div>Generated: {{ now.strftime('%d-%m-%Y %H:%M') }}</div>
-  </div>
-
 </div>
-</div>
-</div>
-
-<script>
-// Auto-print if ?print=1
-if (new URLSearchParams(window.location.search).get('print') === '1') {
-  window.addEventListener('load', () => setTimeout(() => window.print(), 500));
-}
-</script>
-</body>
-</html>
+{% endblock %}

@@ -1,0 +1,117 @@
+{% extends "shared/base.html" %}
+{% block title %}Bulk Upload Patients{% endblock %}
+
+{% block content %}
+<div class="mc-page-header">
+  <div>
+    <h1 class="mc-page-title"><i class="bi bi-upload me-2"></i>Bulk Patient Upload</h1>
+    <div class="mc-breadcrumb">
+      <a href="{{ url_for('patients.index') }}">Patients</a> / Bulk Upload
+    </div>
+  </div>
+  <a href="{{ url_for('patients.download_template') }}" class="btn btn-outline-success btn-sm">
+    <i class="bi bi-download me-1"></i>Download Template
+  </a>
+</div>
+
+<div class="row justify-content-center">
+  <div class="col-md-7">
+    <div class="mc-card">
+      <div class="mc-card-header"><i class="bi bi-file-earmark-excel"></i> Upload Excel / CSV File</div>
+      <div class="mc-card-body">
+
+        <div class="alert alert-info small mb-4">
+          <i class="bi bi-info-circle me-1"></i>
+          <strong>Instructions:</strong> Download the template, fill in patient data, and upload.
+          Required columns are marked with *. Max file size: 10MB.
+          Duplicate phone numbers within the same branch will be skipped.
+        </div>
+
+        <form method="POST" action="{{ url_for('patients.bulk_upload') }}"
+              enctype="multipart/form-data" id="uploadForm">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+          <div class="mc-upload-zone mb-4" id="uploadZone">
+            <input type="file" name="file" accept=".xlsx,.xls,.csv" class="d-none" id="fileInput" required>
+            <i class="bi bi-cloud-upload d-block mb-3"></i>
+            <p class="fw-semibold mb-1">Drag &amp; drop your file here</p>
+            <p class="text-muted small mb-3">or click to browse</p>
+            <div class="mc-upload-filename text-primary fw-semibold" id="fileName">No file selected</div>
+          </div>
+
+          <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-primary" id="uploadBtn" disabled>
+              <i class="bi bi-upload me-1"></i>Upload & Process
+            </button>
+            <a href="{{ url_for('patients.index') }}" class="btn btn-outline-secondary">Cancel</a>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Required columns info -->
+    <div class="mc-card">
+      <div class="mc-card-header"><i class="bi bi-table"></i> Required Columns</div>
+      <div class="mc-card-body">
+        <table class="mc-table">
+          <thead><tr><th>Column Name</th><th>Required</th><th>Notes</th></tr></thead>
+          <tbody>
+            {% set cols = [
+              ('First Name*',    'Yes', 'Patient first name'),
+              ('Last Name',      'No',  'Family/surname'),
+              ('Date of Birth (DD/MM/YYYY)', 'No', 'Format: 25/12/1990'),
+              ('Age',            'No',  'Use if DOB unknown'),
+              ('Gender*',        'Yes', 'Male / Female / Other'),
+              ('Phone*',         'Yes', '10-digit mobile'),
+              ('Email',          'No',  'Valid email'),
+              ('Blood Group',    'No',  'A+, B-, AB+, O-, etc.'),
+              ('Address',        'No',  'Full address'),
+              ('City',           'No',  'City name'),
+              ('Pincode',        'No',  '6-digit pincode'),
+              ('ABHA Number',    'No',  'Ayushman Bharat ID'),
+            ] %}
+            {% for col, req, note in cols %}
+            <tr>
+              <td><code>{{ col }}</code></td>
+              <td>{% if req == 'Yes' %}<span class="badge bg-danger">Required</span>{% else %}<span class="badge bg-secondary">Optional</span>{% endif %}</td>
+              <td class="small text-muted">{{ note }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const fileInput = document.getElementById('fileInput');
+const fileName  = document.getElementById('fileName');
+const uploadBtn = document.getElementById('uploadBtn');
+const uploadZone = document.getElementById('uploadZone');
+
+uploadZone.addEventListener('click', () => fileInput.click());
+
+uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('drag-over'); });
+uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('drag-over'));
+uploadZone.addEventListener('drop', e => {
+  e.preventDefault();
+  uploadZone.classList.remove('drag-over');
+  if (e.dataTransfer.files.length) {
+    fileInput.files = e.dataTransfer.files;
+    updateFileName(e.dataTransfer.files[0].name);
+  }
+});
+
+fileInput.addEventListener('change', function() {
+  if (this.files.length) updateFileName(this.files[0].name);
+});
+
+function updateFileName(name) {
+  fileName.textContent = name;
+  uploadBtn.disabled = false;
+}
+</script>
+{% endblock %}

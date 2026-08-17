@@ -1,0 +1,211 @@
+{% extends "shared/base.html" %}
+{% block title %}Billing{% endblock %}
+
+{% block subnav %}
+<div class="mc-subnav">
+  {% for tid, label in [('summary','Bill Summary'),('credit','Credit Bills'),('saved','Saved Bills'),
+     ('overall','Overall Bills'),('detailed','Detailed Receipt Bills'),('expense','Expense Bills'),('insurance','Insurance Patient')] %}
+  <a href="{{ url_for('billing.index', tab=tid, date_from=date_from, date_to=date_to) }}"
+     class="mc-subnav-item {% if tab==tid %}active{% endif %}">{{ label }}</a>
+  {% endfor %}
+  <div class="ms-auto d-flex gap-2 pe-2 align-items-center">
+    {% if current_user.has_permission('billing','create') %}
+    <a href="{{ url_for('billing.new_bill') }}" class="btn btn-primary btn-sm">
+      <i class="bi bi-plus-circle me-1"></i>New Bill
+    </a>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<!-- Date range filter -->
+<div class="mc-card mb-3">
+  <div class="mc-card-body py-2">
+    <form method="GET" class="d-flex gap-2 align-items-center flex-wrap">
+      <input type="hidden" name="tab" value="{{ tab }}">
+      <label class="mc-label mb-0">From</label>
+      <input type="date" name="date_from" class="form-control form-control-sm" value="{{ date_from }}" style="width:150px">
+      <label class="mc-label mb-0">To</label>
+      <input type="date" name="date_to" class="form-control form-control-sm" value="{{ date_to }}" style="width:150px">
+      <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-search me-1"></i>Filter</button>
+      <button type="button" class="btn btn-outline-secondary btn-sm no-print" data-print>
+        <i class="bi bi-printer me-1"></i>Print
+      </button>
+    </form>
+  </div>
+</div>
+
+<!-- Summary stats row (from Rivive PDF) -->
+<div class="row g-2 mb-3">
+  {% for label, val, icon, color in [
+    ('Total Bills',      stats.total_bills,   'receipt',         'navy'),
+    ('Bill Amount',      '₹'~"{:,.0f}".format(stats.bill_amount), 'currency-rupee','teal'),
+    ('Cash Received',    '₹'~"{:,.0f}".format(stats.cash_received),'cash',        'green'),
+    ('GPay Received',    '₹'~"{:,.0f}".format(stats.gpay_received),'phone',       'blue'),
+    ('Discount Amount',  '₹'~"{:,.0f}".format(stats.discount),    'tag',          'amber'),
+    ('Refund Amount',    '₹'~"{:,.0f}".format(stats.refund),      'arrow-return-left','red'),
+  ] %}
+  <div class="col-6 col-md-4 col-xl-2">
+    <div class="mc-stat">
+      <div class="mc-stat-icon {{ color }}"><i class="bi bi-{{ icon }}"></i></div>
+      <div>
+        <div class="mc-stat-val" style="font-size:1.1rem">{{ val }}</div>
+        <div class="mc-stat-lbl">{{ label }}</div>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- Bills table -->
+<div class="mc-card">
+  <div class="mc-card-header">
+    <i class="bi bi-table"></i> {{ tab|replace('_',' ')|title }} Bills
+    <span class="badge bg-primary ms-2">{{ bills|length }}</span>
+  </div>
+  <div class="mc-card-body p-0">
+    <div class="mc-table-wrap">
+      <table class="mc-table mc-datatable">
+        <thead>
+          <tr>
+            <th>Date & Time</th>
+            <th>Bill No</th>
+            <th>Bill Type</th>
+            <th>Patient Details</th>
+            <th>Phone / Pts ID</th>
+            <th>DO</th>
+            <th>Amount</th>
+            <th>Cash Rec.</th>
+            <th>GPay Rec.</th>
+            <th>Discount</th>
+            <th>Refund</th>
+            <th>Cancelled Bill</th>
+            <th>Payment Mode</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for b in bills %}
+          {% set cash = b.payments.filter_by(payment_mode='cash',is_deleted=False).with_entities(db.func.sum(Payment.amount)).scalar() or 0 %}
+          {% set gpay = 0 %}
+          <tr>
+            <td class="small">{{ b.bill_date.strftime('%d-%m-%Y %H:%M') if b.bill_date else '—' }}</td>
+            <td><span class="mc-uhid">{{ b.bill_number }}</span></td>
+            <td><span class="mc-badge mc-badge-new">{{ b.bill_type|upper }}</span></td>
+            <td>
+              <div class="fw-semibold">{{ b.patient.full_name if b.patient else '—' }}</div>
+              <div class="text-muted small">{{ b.patient.uhid if b.patient else '' }}</div>
+            </td>
+            <td class="small">
+              {{ b.patient.phone if b.patient else '—' }}<br>
+              <span class="text-muted">{{ b.patient.uhid if b.patient else '' }}</span>
+            </td>
+            <td class="small text-muted">{{ b.bill_date.strftime('%d.%m.%y') if b.bill_date else '—' }}</td>
+            <td class="fw-semibold">₹{{ "{:,.2f}".format(b.gross_total or 0) }}</td>
+            <td class="small">₹{{ "{:,.0f}".format(b.paid_amount or 0) }}</td>
+            <td class="small text-muted">—</td>
+            <td class="small text-muted">₹{{ "{:,.2f}".format(b.discount_amount or 0) }}</td>
+            <td class="small text-muted">—</td>
+            <td>
+              {% if b.status == 'cancelled' %}
+              <span class="mc-badge mc-badge-cancelled">[-] Cancelled</span>
+              {% else %}—{% endif %}
+            </td>
+            <td class="small">
+              {% set pmt = b.payments.filter_by(is_deleted=False).first() %}
+              {{ pmt.payment_mode|title if pmt else '—' }}
+            </td>
+            <td>
+              <div class="d-flex gap-1">
+                <a href="{{ url_for('billing.view_bill', bill_id=b.id) }}"
+                   class="btn btn-icon btn-outline-primary" title="View Bill"><i class="bi bi-eye"></i></a>
+                <a href="{{ url_for('billing.print_bill', bill_id=b.id) }}"
+                   class="btn btn-icon btn-outline-secondary" title="Print Bill" target="_blank"><i class="bi bi-printer"></i></a>
+                {% if b.status not in ['cancelled'] and current_user.has_permission('billing','edit') %}
+                <form method="POST" action="{{ url_for('billing.cancel_bill', bill_id=b.id) }}" class="d-inline">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <button type="submit" class="btn btn-icon btn-outline-danger" title="Void"
+                          data-confirm="Cancel this bill?"><i class="bi bi-x-circle"></i></button>
+                </form>
+                {% endif %}
+              </div>
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="14" class="text-center text-muted py-5">
+            <i class="bi bi-receipt display-6 d-block mb-2 opacity-25"></i>No bills found for selected period.
+          </td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Day-end denomination (from PDF) -->
+<div class="mc-card">
+  <div class="mc-card-header"><i class="bi bi-calculator"></i> Day-End Denomination</div>
+  <div class="mc-card-body">
+    <div class="row g-3 align-items-center">
+      <div class="col-md-6">
+        <table class="table table-sm table-bordered mb-0" style="font-size:.82rem">
+          <thead class="table-light"><tr><th>Denomination</th><th>Count</th><th>Amount</th></tr></thead>
+          <tbody>
+            {% for denom in [2000,500,200,100,50,20,10,5,2,1] %}
+            <tr>
+              <td>₹{{ denom }}</td>
+              <td><input type="number" class="form-control form-control-sm denom-count" data-val="{{ denom }}" min="0" value="0" style="width:80px"></td>
+              <td class="denom-amt text-end fw-semibold">₹0</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+          <tfoot class="table-secondary">
+            <tr><th colspan="2">Total Amount</th><th class="text-end" id="denom-total">₹0</th></tr>
+          </tfoot>
+        </table>
+      </div>
+      <div class="col-md-6">
+        <div class="mc-card" style="background:#f8fafc">
+          <div class="mc-card-body">
+            <dl class="row mb-0" style="font-size:.85rem">
+              <dt class="col-7">Cash Received Today</dt>
+              <dd class="col-5 text-end fw-bold">₹{{ "{:,.2f}".format(stats.cash_received) }}</dd>
+              <dt class="col-7">GPay / Card Received</dt>
+              <dd class="col-5 text-end fw-bold">₹{{ "{:,.2f}".format(stats.gpay_received) }}</dd>
+              <dt class="col-7">Discount Given</dt>
+              <dd class="col-5 text-end text-warning fw-bold">- ₹{{ "{:,.2f}".format(stats.discount) }}</dd>
+              <dt class="col-7">Refunds</dt>
+              <dd class="col-5 text-end text-danger fw-bold">- ₹{{ "{:,.2f}".format(stats.refund) }}</dd>
+              <hr>
+              <dt class="col-7 fw-bold">Total Amount</dt>
+              <dd class="col-5 text-end fw-bold text-success" style="font-size:1.1rem">
+                ₹{{ "{:,.2f}".format(stats.cash_received + stats.gpay_received) }}
+              </dd>
+            </dl>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.querySelectorAll('.denom-count').forEach(inp => {
+  inp.addEventListener('input', function() {
+    const val = parseInt(this.dataset.val);
+    const cnt = parseInt(this.value) || 0;
+    const amt = val * cnt;
+    this.closest('tr').querySelector('.denom-amt').textContent = '₹' + amt.toLocaleString('en-IN');
+    // Recalc total
+    let total = 0;
+    document.querySelectorAll('.denom-count').forEach(i => {
+      total += parseInt(i.dataset.val) * (parseInt(i.value)||0);
+    });
+    document.getElementById('denom-total').textContent = '₹' + total.toLocaleString('en-IN');
+  });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,77 @@
+{% extends "shared/base.html" %}
+{% block title %}Patient Report{% endblock %}
+{% block subnav %}
+<div class="mc-subnav">
+  <a href="{{ url_for('reports.index') }}" class="mc-subnav-item"><i class="bi bi-arrow-left me-1"></i>Reports</a>
+  {% for sid, slabel in [('demographic','Patient Demographic'),('purpose_of_visit','Purpose of Visit'),
+     ('diagnosis','Diagnosis Report'),('concession','Concession Report'),
+     ('credit_adjustment','Credit Adjustment'),('doctor_consultation','Doctor-wise Consultation')] %}
+  <a href="{{ url_for('reports.patient_report', sub=sid, date_from=date_from, date_to=date_to) }}"
+     class="mc-subnav-item {% if sub==sid %}active{% endif %}">{{ slabel }}</a>
+  {% endfor %}
+</div>
+{% endblock %}
+{% block content %}
+{% set report_type = 'patient' %}
+<div class="mc-page-header">
+  <h1 class="mc-page-title"><i class="bi bi-people"></i> Patient Report — {{ sub|replace('_',' ')|title }}</h1>
+</div>
+{% include 'reports/_report_header.html' %}
+<div class="mc-card">
+  <div class="mc-card-header"><i class="bi bi-table"></i> {{ sub|replace('_',' ')|title }}
+    <span class="badge bg-primary ms-2">{{ data|length }}</span>
+  </div>
+  <div class="mc-card-body p-0">
+    <div class="mc-table-wrap">
+      {% if sub == 'demographic' %}
+      <table class="mc-table mc-datatable">
+        <thead><tr><th>UHID</th><th>Name</th><th>Age</th><th>Gender</th><th>Phone</th><th>City</th><th>Blood Group</th><th>Reg. Date</th></tr></thead>
+        <tbody>
+          {% for p in data %}
+          <tr>
+            <td><span class="mc-uhid">{{ p.uhid }}</span></td>
+            <td class="fw-semibold">{{ p.full_name }}</td>
+            <td class="small">{{ p.age_years or '—' }}</td>
+            <td><span class="mc-badge {% if p.gender=='Male' %}mc-badge-new{% else %}mc-badge-review{% endif %}">{{ p.gender or '—' }}</span></td>
+            <td class="small">{{ p.phone }}</td>
+            <td class="small text-muted">{{ p.city or '—' }}</td>
+            <td class="small">{{ p.blood_group or '—' }}</td>
+            <td class="small text-muted">{{ p.created_at.strftime('%d-%m-%Y') if p.created_at else '—' }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="8" class="text-center text-muted py-4">No patients found.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% elif sub in ['purpose_of_visit','diagnosis'] %}
+      <table class="mc-table mc-datatable">
+        <thead><tr><th>{{ 'Reason / Purpose' if sub=='purpose_of_visit' else 'Diagnosis' }}</th><th>Count</th></tr></thead>
+        <tbody>
+          {% for row in data %}
+          <tr>
+            <td>{{ row[0] or '—' }}</td>
+            <td class="fw-bold">{{ row.count }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="2" class="text-center text-muted py-4">No data.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% elif sub == 'doctor_consultation' %}
+      <table class="mc-table mc-datatable">
+        <thead><tr><th>Doctor</th><th>Consultations</th></tr></thead>
+        <tbody>
+          {% for row in data %}
+          <tr><td class="fw-semibold">{{ row.doctor }}</td><td>{{ row.consultations }}</td></tr>
+          {% else %}
+          <tr><td colspan="2" class="text-center text-muted py-4">No data.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <div class="p-4 text-center text-muted">Report coming soon for: {{ sub }}</div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}
