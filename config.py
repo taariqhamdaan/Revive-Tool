@@ -42,6 +42,9 @@ class Config:
     MAIL_USERNAME = os.environ.get("MAIL_USERNAME")
     MAIL_PASSWORD = os.environ.get("MAIL_PASSWORD")
     MAIL_DEFAULT_SENDER = os.environ.get("MAIL_DEFAULT_SENDER", "Revive <noreply@revive.local>")
+    # No SMTP credentials configured yet — suppress sends instead of failing
+    # at connect time. Set to "0" once MAIL_USERNAME/MAIL_PASSWORD are real.
+    MAIL_SUPPRESS_SEND = os.environ.get("MAIL_SUPPRESS_SEND", "1") == "1"
 
     # ── File Uploads ──────────────────────────────────────────────────────
     # Vercel's function filesystem is read-only outside /tmp.
