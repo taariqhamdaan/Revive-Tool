@@ -80,7 +80,11 @@ class User(UserMixin, db.Model):
     __tablename__ = "users"
 
     id               = db.Column(db.Integer, primary_key=True)
-    branch_id        = db.Column(db.Integer, db.ForeignKey("branches.id"), nullable=True)  # NULL = SuperAdmin
+    branch_id        = db.Column(db.Integer, db.ForeignKey("branches.id"), nullable=True)
+    # Nullable for multi-branch corporate roles with no single home branch, but most
+    # create routes use current_user.branch_id directly and would violate NOT NULL
+    # constraints if it's ever None - assign a real branch even to SuperAdmin users.
+    # is_superadmin (not a null branch_id) is what actually grants full-system access.
     role_id          = db.Column(db.Integer, db.ForeignKey("roles.id"), nullable=False)
     employee_id      = db.Column(db.Integer, db.ForeignKey("employees.id"), nullable=True)  # linked staff record
 
